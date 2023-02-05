@@ -1,0 +1,6 @@
+venv
+projet.iml
+.idea
+.vscode
+output
+*/.ipynb_checkpoints

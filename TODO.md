@@ -1,0 +1,11 @@
+# TODO to fully automate process of data gathering and recommand system
+- [ ] Download image dataset
+- [ ] Get metadata from dataset
+  - [ ] Get image size, resolution, exif, etc
+  - [ ] Get image tags by labelizing them from user input
+  - [ ] Get image tags by using a pretrained model (yolov3, etc)
+  - [ ] Save metadata in a database
+- [ ] Get color palette from image
+- [ ] Cluster images by color palette
+- [ ] Cluster images by metadata
+- 

@@ -1,0 +1,3 @@
+- Create folder named images
+- Download open source images
+- Save metadata in json file for each image (name, extension, orientation, size, date, location, license, tags, etc.)
