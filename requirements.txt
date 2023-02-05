@@ -81,3 +81,4 @@ cycler~=0.11.0
 kiwisolver~=1.4.4
 zipp~=3.12.0
 platformdirs~=2.6.2
+tqdm~=4.64.1
