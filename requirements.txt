@@ -8,7 +8,6 @@ cffi~=1.15.1
 Pillow~=9.4.0
 ipython~=8.9.0
 jupyter~=1.0.0
-pip~=22.3.1
 attrs~=22.2.0
 wheel~=0.38.4
 tornado~=6.2
