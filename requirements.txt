@@ -82,3 +82,6 @@ zipp~=3.12.0
 platformdirs~=2.6.2
 tqdm~=4.64.1
 PyExifTool~=0.5.5
+seaborn~=0.12.2
+folium~=0.14.0
+squarify~=0.4.3
