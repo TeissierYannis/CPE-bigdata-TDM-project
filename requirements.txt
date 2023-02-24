@@ -85,3 +85,4 @@ PyExifTool~=0.5.5
 seaborn~=0.12.2
 folium~=0.14.0
 squarify~=0.4.3
+spacy~=3.5.0
