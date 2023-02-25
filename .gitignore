@@ -2,5 +2,7 @@ venv
 projet.iml
 .idea
 .vscode
-output
+output/images
+output/config
+output/.DS_Store
 */.ipynb_checkpoints
