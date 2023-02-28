@@ -6,3 +6,4 @@ output/images
 output/config
 output/.DS_Store
 */.ipynb_checkpoints
+.DS_Store
