@@ -8,3 +8,4 @@ output/.DS_Store
 */.ipynb_checkpoints
 .DS_Store
 .env
+*/.env
