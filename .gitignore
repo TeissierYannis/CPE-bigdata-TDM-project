@@ -9,3 +9,5 @@ output/.DS_Store
 .DS_Store
 .env
 */.env
+./services/db/*
+./services/shared/*
