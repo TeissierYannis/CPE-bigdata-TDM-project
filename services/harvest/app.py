@@ -19,8 +19,8 @@ load_dotenv()
 app = Flask(__name__)
 
 # Path to save images
-images_path = './images'
-binary = './config/exifextract'
+images_path = '/app/shared/images'
+binary = '/app/shared/config/exifextract'
 # Path to save metadata
 metadata_path = './metadata'
 # Database configuration

@@ -12,10 +12,8 @@ from .classes import sharedprogress
 
 app = Flask(__name__)
 
-# Dataset URL
-URL = 'https://unsplash.com/data/lite/latest'
 # Path to save images
-images_path = './images'
+images_path = '/app/shared/images'
 
 
 async def download_images(session: aiohttp.ClientSession, urls: List[str]) -> None:

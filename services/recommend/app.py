@@ -13,8 +13,6 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Path to save images
-images_path = './images'
 cnf = {
     'host': os.getenv("SQL_HOST") or 'localhost',
     'user': os.getenv("SQL_USER") or 'root',
@@ -27,16 +25,6 @@ cnf = {
 connection_pool = pooling.MySQLConnectionPool(pool_name="mypool",
                                               pool_size=2,
                                               **cnf)
-
-# TODO : Update this
-preferences = {
-    'Make': '',
-    'ImageWidth': '',
-    'ImageHeight': '',
-    'Orientation': 1,
-    'dominant_color': '#73AD3D',
-    'tags': ['vase', 'toilet']
-}
 
 
 def get_all_images(path):
@@ -95,7 +83,7 @@ def get_metadata_from_mariadb_db():
     conn.close()
 
     # Create an empty DataFrame with the desired columns
-    columns = ['filename', 'Make', 'Software', 'ImageWidth', 'ImageHeight', 'Orientation', 'DateTimeOriginal',
+    columns = ['filename', 'Make', 'ImageWidth', 'ImageHeight', 'Orientation', 'DateTimeOriginal',
                'dominant_color', 'tags']
     df = pd.DataFrame(columns=columns)
 
@@ -120,6 +108,20 @@ def get_metadata_from_mariadb_db():
         except Exception as e:
             return e
 
+
+    # Verify that df is a DataFrame
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("df should be a pandas DataFrame")
+
+    # Verify that df has the correct columns
+    if not set(columns).issubset(df.columns):
+        missing_columns = set(columns) - set(df.columns)
+        raise ValueError(f"Missing columns: {missing_columns}")
+
+    # Verify that df has the correct shape
+    if df.shape[0] < 1:
+        raise ValueError("df should have at least 1 row")
+
     return df
 
 
@@ -139,7 +141,13 @@ def get_clean_preferences(df_preferences):
 
 
 def get_clean_dataset():
-    metadata = get_metadata_from_mariadb_db()
+    try:
+        metadata = get_metadata_from_mariadb_db()
+    except Exception as e:
+        print(f"An error occurred while fetching metadata: {e}")
+        return None
+
+    # convert to DataFrame
     df_metadata = pd.DataFrame(metadata)
     # remove the rows with nan in dominant_color
     df_metadata = df_metadata.dropna(subset=['dominant_color'])
@@ -211,6 +219,8 @@ def recommend_colors(df_metadata, df_preferences, n=0):
 def recommend_tags(df_metadata, df_preferences, n=0, nlp=None):
     # Load the spaCy model if it hasn't been loaded
     if not nlp:
+        # download the model
+        spacy.cli.download("en_core_web_md")
         nlp = spacy.load("en_core_web_md")
 
     # Define the preferences list and the dataframe

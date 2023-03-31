@@ -1,0 +1,97 @@
+version: '3.9'
+services:
+  tools:
+    build: ./tools
+    volumes:
+      - ./shared:/app/shared # Replace the shared_volume volume with a host directory
+  gateway:
+    build: ./gateway
+    ports:
+      - "80:80"
+    depends_on:
+      - gather
+      - harvest
+      - recommend
+      - tools
+    volumes:
+      - ./shared:/app/shared # Replace the shared_volume volume with a host directory
+    environment:
+      GATHER_SERVICE_URL: http://gather:4001/
+      HARVEST_SERVICE_URL: http://harvest:4002/
+      VISUALIZE_SERVICE_URL: http://visualize:4003/
+      RECOMMEND_SERVICE_URL: http://recommend:4004/
+    networks:
+      default:
+        aliases:
+          - gateway
+  gather:
+    build: ./gather
+    depends_on:
+      - db
+      - tools
+    environment:
+      SQL_HOST: db
+      SQL_USER: bigdatauser
+      SQL_PASSWORD: bigdatapassword
+      SQL_DATABASE: bigdata
+      SQL_PORT: 3306
+    volumes:
+      - ./shared:/app/shared # Replace the shared_volume volume with a host directory
+    networks:
+      default:
+        aliases:
+          - gather
+  harvest:
+    build: ./harvest
+    depends_on:
+      - db
+      - tools
+    environment:
+      SQL_HOST: db
+      SQL_USER: bigdatauser
+      SQL_PASSWORD: bigdatapassword
+      SQL_DATABASE: bigdata
+      SQL_PORT: 3306
+    volumes:
+      - ./shared:/app/shared # Replace the shared_volume volume with a host directory
+    networks:
+      default:
+        aliases:
+          - harvest
+  recommend:
+    build: ./recommend
+    depends_on:
+      - db
+      - tools
+    environment:
+      SQL_HOST: db
+      SQL_USER: bigdatauser
+      SQL_PASSWORD: bigdatapassword
+      SQL_DATABASE: bigdata
+      SQL_PORT: 3306
+    volumes:
+      - ./shared:/app/shared # Replace the shared_volume volume with a host directory
+    networks:
+      default:
+        aliases:
+          - recommend
+  db:
+    image: mariadb:10
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bigdata
+      MYSQL_USER: bigdatauser
+      MYSQL_PASSWORD: bigdatapassword
+    depends_on:
+        - tools
+    volumes:
+      - ./db:/var/lib/mysql # Replace the db_volume volume with a host directory
+      - ./init:/docker-entrypoint-initdb.d
+    networks:
+      default:
+        aliases:
+          - db
+
+networks:
+  default:
+    name: my_network

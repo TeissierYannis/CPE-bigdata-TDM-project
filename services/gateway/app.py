@@ -1,18 +1,44 @@
+import requests
+import os
+
 from flask import Flask, jsonify, request
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
-# Define a sample endpoint
-@app.route('/', methods=['GET'])
-def hello():
-    return jsonify({'message': 'Hello, World!'})
 
-# Define a sample POST endpoint
-@app.route('/greet', methods=['POST'])
-def greet():
-    data = request.get_json()
-    name = data['name']
-    return jsonify({'message': f'Hello, {name}!'})
+# Define a sample endpoint
+@app.route('/api/v1/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/<service>/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+def redirect(service, path):
+    if service == 'gather':
+        url = os.getenv('GATHER_SERVICE_URL') + path
+    elif service == 'harvest':
+        url = os.getenv('HARVEST_SERVICE_URL') + path
+    elif service == "recommend":
+        url = os.getenv('RECOMMEND_SERVICE_URL') + path
+    elif service == "visualize":
+        url = os.getenv('VISUALIZE_SERVICE_URL') + path
+    else:
+        return jsonify({'status': 'error', 'message': 'service not found'})
+
+    response = requests.request(
+        method=request.method,
+        url=url,
+        headers={key: value for (key, value) in request.headers if key != 'Host'},
+        data=request.get_data(),
+        cookies=request.cookies,
+        allow_redirects=False
+    )
+
+    return response.content, response.status_code, response.headers.items()
+
 
 if __name__ == '__main__':
     app.run(debug=True)
