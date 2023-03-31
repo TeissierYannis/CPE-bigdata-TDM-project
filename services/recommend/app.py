@@ -1,5 +1,8 @@
+import json
+import logging
 import os
 
+import numpy as np
 from flask import Flask, request
 
 from mysql.connector import pooling
@@ -8,8 +11,8 @@ from sklearn.metrics.pairwise import euclidean_distances
 import spacy
 import pandas as pd
 from dotenv import load_dotenv
-load_dotenv()
 
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -68,30 +71,32 @@ def get_metadata_from_mariadb_db():
     """
     # Open a connection to the database
     conn = connection_pool.get_connection()
-    # Create a cursor
-    c = conn.cursor()
 
-    # Retrieve the metadata
-    c.execute("""
+    # Define the SQL query
+    query = """
         SELECT filename, GROUP_CONCAT(CONCAT(mkey, '\t', mvalue) SEPARATOR '\n') AS metadata
         FROM metadata
         GROUP BY filename;
-    """)
-    metadata = c.fetchall()
+    """
+
+    # Retrieve the metadata and create a DataFrame
+    df = pd.read_sql(query, conn)
 
     # Close the connection
     conn.close()
 
-    # Create an empty DataFrame with the desired columns
+    # Define the desired columns
     columns = ['filename', 'Make', 'ImageWidth', 'ImageHeight', 'Orientation', 'DateTimeOriginal',
                'dominant_color', 'tags']
-    df = pd.DataFrame(columns=columns)
+
+    # Create an empty DataFrame with the desired columns
+    metadata_df = pd.DataFrame(columns=columns)
 
     # Fill the DataFrame with the metadata
-    for image in tqdm(metadata, desc="Get metadata from database"):
+    for _, row in tqdm(df.iterrows(), desc="Get metadata from database", total=df.shape[0]):
         try:
-            props = {'filename': image[0]}
-            metadata_str = image[1].split('\n')
+            props = {'filename': row['filename']}
+            metadata_str = row['metadata'].split('\n')
             for prop in metadata_str:
                 if prop:
                     k, value = prop.split('\t')
@@ -104,38 +109,29 @@ def get_metadata_from_mariadb_db():
                             props[k] = eval(value)
                         else:
                             props[k] = value
-            df = df.append(props, ignore_index=True)
+
+            metadata_df = metadata_df.append(props, ignore_index=True)
         except Exception as e:
-            return e
+            continue
 
+    # Set missing columns to None
+    for col in columns:
+        if col not in metadata_df.columns:
+            metadata_df[col] = np.nan
 
-    # Verify that df is a DataFrame
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("df should be a pandas DataFrame")
-
-    # Verify that df has the correct columns
-    if not set(columns).issubset(df.columns):
-        missing_columns = set(columns) - set(df.columns)
-        raise ValueError(f"Missing columns: {missing_columns}")
-
-    # Verify that df has the correct shape
-    if df.shape[0] < 1:
-        raise ValueError("df should have at least 1 row")
-
-    return df
+    return metadata_df
 
 
 def get_clean_preferences(df_preferences):
-    # remove the rows with nan in dominant_color
-    df_preferences = df_preferences.dropna(subset=['dominant_color'])
-    # split dominant color into 4 columns and remove the dominant_color column
-    # convert the tags column to a list of strings
     # Replace all NaN values with empty strings with the fillna() method
     df_preferences = df_preferences.fillna(0)
-    # convert colors to rgb values
-    df_preferences['dominant_color'] = df_preferences['dominant_color'].apply(lambda x: hex_to_rgb(x))
-    # replace all 0 values with empty strings
-    df_preferences['dominant_color'] = df_preferences['dominant_color'].replace(0, '')
+    # remove the rows with nan in dominant_color
+    if 'dominant_color' in df_preferences.columns:
+        df_preferences = df_preferences.dropna(subset=['dominant_color'])
+        # convert colors to rgb values
+        df_preferences['dominant_color'] = df_preferences['dominant_color'].apply(lambda x: hex_to_rgb(x))
+        # replace all 0 values with empty strings
+        df_preferences['dominant_color'] = df_preferences['dominant_color'].replace(0, '')
 
     return df_preferences
 
@@ -146,7 +142,6 @@ def get_clean_dataset():
     except Exception as e:
         print(f"An error occurred while fetching metadata: {e}")
         return None
-
     # convert to DataFrame
     df_metadata = pd.DataFrame(metadata)
     # remove the rows with nan in dominant_color
@@ -231,10 +226,14 @@ def recommend_tags(df_metadata, df_preferences, n=0, nlp=None):
     # replace int with empty list
     df['tags'] = df['tags'].apply(lambda x: x if x else [])
 
+    preferences = [word.strip() for word in preferences.strip('[]').split(',')]
+
+    # PROBLEM HERE
+
     # Precompute the similarity between each tag word and each preference word
     similarity_dict = {}
     for tag_word in set([word for tags in df['tags'] for word in tags]):
-        for pref_word in set(preferences):
+        for pref_word in preferences:
             similarity_dict[(tag_word, pref_word)] = nlp(tag_word).similarity(nlp(pref_word))
 
     # Compute the average similarity for each row in the dataframe
@@ -327,7 +326,8 @@ def recommend_size(df_metadata, df_preferences, n=0):
     product = width * height
 
     # Use apply method to compute similarity score for each row
-    df['similarity_size'] = df.apply(lambda x: 1 - abs(product - (x['ImageWidth'] * x['ImageHeight'])) / product, axis=1)
+    df['similarity_size'] = df.apply(lambda x: 1 - abs(product - (x['ImageWidth'] * x['ImageHeight'])) / product,
+                                     axis=1)
 
     if n == 0:
         closest_matches = df.sort_values('similarity_size', ascending=False)[
@@ -340,57 +340,105 @@ def recommend_size(df_metadata, df_preferences, n=0):
 
 
 def recommend(df_metadata, df_preferences, n=0):
-    # Assign weights to properties based on user preferences
-    weights = {
-        'Make': float(5.0),
-        'ImageWidth': float(1.0),
-        'ImageHeight': float(1.0),
-        'Orientation': float(2.0),
-        'dominant_color': float(3.0),
-        'tags': float(5.0)
+    # Create empty dataframe to store similarity scores
+    similarities_df = pd.DataFrame(columns=['filename'])
+    # fill filename column with filenames
+    similarities_df['filename'] = df_metadata['filename']
+
+    # Dictionary to map preference names to similarity column names
+    similarity_columns = {
+        'dominant_color': 'similarity_dominant_color',
+        'tags': 'similarity_tags',
+        'Make': 'similarity_make',
+        'Orientation': 'similarity_orientation',
+        'ImageWidth': 'similarity_size',
+        'ImageHeight': 'similarity_size'
     }
 
-    # Create a dictionary with the preferences and the corresponding recommendation methods
-    preference_methods = {
-        'Make': recommend_make,
-        'ImageWidth': recommend_size,
-        'ImageHeight': recommend_size,
-        'Orientation': recommend_orientation,
-        'dominant_color': recommend_colors,
-        'tags': recommend_tags
-    }
-
-    # Remove preferences with no values
-    preferences = {k: v for k, v in df_preferences.squeeze().to_dict().items() if v != ''}
-
-    # Calculate the sum of the weights
-    weights_sum = 0
-    for key in weights:
-        weights_sum += weights[key]
-    for key in weights:
-        weights[key] = weights[key] / weights_sum
-
-    # Calculate similarity score for each property
-    df_metadata['similarity_score'] = 0.0
-    for preference, value in preferences.items():
-        method = preference_methods[preference]
-        # if it's height or width, the name of the column is different similarity_size
-        if preference == 'ImageWidth' or preference == 'ImageHeight':
-            similarity = method(df_metadata, df_preferences, n)['similarity_size'].astype(float)
+    # Iterate over each preference and call the corresponding recommendation method
+    for preference in df_preferences.columns:
+        if preference == 'dominant_color':
+            # Call recommend_colors method
+            similarity_scores = recommend_colors(df_metadata, df_preferences, n)
+            similarities_df = similarities_df.merge(similarity_scores, on='filename', how='left')
+        elif preference == 'tags':
+            # Call recommend_tags method
+            similarity_scores = recommend_tags(df_metadata, df_preferences, n)
+            similarities_df = similarities_df.merge(similarity_scores, on='filename', how='left')
+        elif preference == 'Make':
+            # Call recommend_make method
+            similarity_scores = recommend_make(df_metadata, df_preferences, n)
+            similarities_df = similarities_df.merge(similarity_scores, on='filename', how='left')
+        elif preference == 'Orientation':
+            # Call recommend_orientation method
+            similarity_scores = recommend_orientation(df_metadata, df_preferences, n)
+            similarities_df = similarities_df.merge(similarity_scores, on='filename', how='left')
+        elif preference in ['ImageWidth', 'ImageHeight']:
+            # Call recommend_size method if one of the size is not given, then skip this preference and verify that
+            # similarity_df do not contain this preference
+            if df_preferences['ImageWidth'][0] == ''\
+                    or df_preferences['ImageHeight'][0] == ''\
+                    or 'similarity_size' in similarities_df.columns:
+                continue
+            # append the similarity scores to the dataframe
+            similarity_scores = recommend_size(df_metadata, df_preferences, n)
+            similarities_df = similarities_df.merge(similarity_scores, on='filename', how='left')
         else:
-            similarity = method(df_metadata, df_preferences, n)[f'similarity_{preference.lower()}'].astype(float)
-        df_metadata['similarity_score'] += similarity * (weights[preference] / weights_sum)
+            raise ValueError(f"Invalid preference: {preference}")
 
-    # Replace NaN values in the 'similarity_score' column with 0
-    df_metadata['similarity_score'].fillna(0, inplace=True)
+    # Compute weighted average of similarity scores for each row
+    weights = {
+        'dominant_color': 0.2,
+        'tags': 0.3,
+        'Make': 0.2,
+        'Orientation': 0.1,
+        'size': 0.2
+    }
 
-    # Sort by similarity score
-    if n == 0:
-        closest_matches = df_metadata.sort_values('similarity_score', ascending=False)[
-            ['filename', 'similarity_score']]
+    # Compute total weight for all preferences provided by the user but not size add it after the sum cause the key
+    # size is not in the df_preferences.columns
+    total_weight = sum([weights[preference] for preference in df_preferences.columns if preference != 'ImageWidth' and preference != 'ImageHeight'])
+    # Add the size weight to the total weight
+    total_weight += weights['size']
+
+    # Update weights based on the total weight
+    if len(df_preferences.columns) == 1:
+        # If only one preference is provided and it's not size, set the weight for that preference to 1
+        weights[df_preferences.columns[0]] = 1.0
     else:
-        closest_matches = df_metadata.sort_values('similarity_score', ascending=False).head(n)[
-            ['filename', 'similarity_score']]
+        # Compute the weight for each preference based on the total weight
+        for preference in df_preferences.columns:
+            if preference in ['ImageWidth', 'ImageHeight']:
+                continue
+            else:
+                weights[preference] = weights[preference] + ((1 - total_weight) * (weights[preference] / total_weight))
+
+    # Check the sum of all used weights Compute total weight for all preferences provided by the user but not size
+    # add it after the sum cause the key size is not in the df_preferences.columns
+    total_weight = sum([weights[preference] for preference in df_preferences.columns if preference != 'ImageWidth' and preference != 'ImageHeight'])
+    # Add the size weight to the total weight
+    total_weight += weights['size']
+    if total_weight != 1.0:
+        # update size weight
+        weights['size'] = 1.0 - total_weight + weights['size']
+
+    # The score is between 0 and 1, so we can just multiply the score by the weight and sum them up
+    similarities_df['similarity_total'] = 0.0
+    for preference in df_preferences.columns:
+        if preference in ['ImageWidth', 'ImageHeight']:
+            # if one of the size is not given, then skip this preference
+            if df_preferences['ImageWidth'][0] == '' or df_preferences['ImageHeight'][0] == '':
+                similarities_df['similarity_total'] += weights['size'] * similarities_df['similarity_size']
+        else:
+            similarities_df['similarity_total'] += weights[preference] * similarities_df[similarity_columns[preference]]
+
+    # Sort dataframe by similarity score in descending order and return top n matches
+    if n == 0:
+        closest_matches = similarities_df.sort_values('similarity_total', ascending=False)[
+            ['filename', 'similarity_total']]
+    else:
+        closest_matches = similarities_df.sort_values('similarity_total', ascending=False).head(n)[
+            ['filename', 'similarity_total']]
 
     return closest_matches
 
@@ -400,19 +448,24 @@ def recommend_images():
     # get the preferences from the request
     preferences = request.get_json()
     # valid preferences are Make, ImageWidth, ImageHeight, Orientation, dominant_color, tags
-    preferences = {k: v for k, v in preferences.items() if k in ['Make', 'ImageWidth', 'ImageHeight', 'Orientation', 'dominant_color', 'tags']}
-    #preferences = {
-    #   'Make': '',
-    #   'ImageWidth': '',
-    #   'ImageHeight': '',
-    #   'Orientation': 1,
-    #   'dominant_color': '#73AD3D',
-    #   'tags': ['vase', 'toilet']
-    #}
+    preferences = {k: v for k, v in preferences.items() if k in
+                   ['Make', 'ImageWidth', 'ImageHeight', 'Orientation', 'dominant_color', 'tags']
+                   }
+
+    # If there is ImageWidth is set, but ImageHeight is not, set ImageHeight to ImageWidth
+    if 'ImageWidth' in preferences and 'ImageHeight' not in preferences:
+        preferences['ImageHeight'] = preferences['ImageWidth']
+    # If there is ImageHeight is sxet, but ImageWidth is not, set ImageWidth to ImageHeight
+    if 'ImageHeight' in preferences and 'ImageWidth' not in preferences:
+        preferences['ImageWidth'] = preferences['ImageHeight']
+
+    # Not sure about this line, but it seems to work
+    update_preferences = {k: [v] for k, v in preferences.items()}
 
     df_metadata = get_clean_dataset()
-    df_pref = pd.DataFrame([preferences])
+    df_pref = pd.DataFrame(update_preferences)
     df_preferences = get_clean_preferences(df_pref)
+
     result = recommend(df_metadata, df_preferences)
     # get the top 10 results and return them as base64 encoded images
     top_10 = pd.DataFrame(result.head(10))

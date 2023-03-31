@@ -13,6 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code into the container
 COPY . .
 
+RUN python -m spacy download en_core_web_md
+
 # Expose port 80 for the Flask app to listen on
 EXPOSE 4004
 
