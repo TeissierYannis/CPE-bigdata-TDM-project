@@ -3,7 +3,7 @@ import logging
 import os
 
 import numpy as np
-from flask import Flask, request
+from flask import Flask, request, jsonify
 
 from mysql.connector import pooling
 from tqdm import tqdm
@@ -470,6 +470,52 @@ def recommend_images():
     # get the top 10 results and return them as base64 encoded images
     top_10 = pd.DataFrame(result.head(10))
     return top_10.to_json(orient='records')
+
+
+# TEST CODE
+from sklearn.metrics.pairwise import cosine_similarity
+from collections import namedtuple
+import numpy as np
+
+ImageProperties = namedtuple('ImageProperties', ['name', 'hex_color', 'tags', 'make', 'orientation', 'width', 'height'])
+
+# Sample data
+data = [
+    ImageProperties('Image1', '#FF0000', ['car', 'road'], 'Canon', 0, 1024, 768),
+    ImageProperties('Image2', '#00FF00', ['flower', 'garden'], 'Nikon', 1, 800, 600),
+    # Add more images...
+]
+
+def hex_to_rgb(hex_color):
+    return tuple(int(hex_color[i:i+2], 16) for i in (1, 3, 5))
+
+def preprocess_data(data):
+    for image in data:
+        image_tags = " ".join(image.tags)
+        yield np.array([
+            *hex_to_rgb(image.hex_color),
+            len(image_tags),
+            len(image.make),
+            image.orientation,
+            image.width,
+            image.height
+        ])
+
+
+
+def test_recommend_images(image_index, data, top_n=10):
+    preprocessed_data = np.array(list(preprocess_data(data)))
+    similarity_matrix = cosine_similarity(preprocessed_data)
+    most_similar_indices = np.argsort(-similarity_matrix[image_index])[1:top_n+1]
+    return [data[i] for i in most_similar_indices]
+
+
+@app.route("/test", methods=['GET'])
+def test():
+    # Test the recommender system
+    recommended_images = test_recommend_images(0, data)
+    return jsonify([image.name for image in recommended_images])
+
 
 
 if __name__ == '__main__':
