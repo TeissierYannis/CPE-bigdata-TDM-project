@@ -8,15 +8,16 @@ import webcolors
 import collections
 import numpy as np
 import pandas as pd
+import mysql.connector
+import matplotlib.pyplot as plt
+
 from tqdm import tqdm
 from PIL import Image
-import mysql.connector
 from dotenv import load_dotenv
 from collections import Counter
-import matplotlib.pyplot as plt
+from flask import Flask, Response
 from geopy.geocoders import Nominatim
 from scipy.spatial.distance import pdist
-from flask import Flask, Response, request, make_response, render_template
 from scipy.cluster.hierarchy import dendrogram, linkage
 
 load_dotenv()
@@ -263,10 +264,9 @@ def fig_to_buffer(fig):
     return buf
 
 
-def merge_images_from_buffers(*buffers, max_columns=2):
+def merge_buffers_to_img(*buffers, max_columns=2):
     """
-    Merge images from buffers
-    It will merge the images from the buffers into a single image.
+    Merge the images from the buffers into a single image.
     The images will be merged in a grid with a maximum number of columns.
     The images will be resized to fit the grid.
 
@@ -415,9 +415,45 @@ def display_tree_map(title, sizes, labels, colors, alpha=0.6):
     return fig_to_buffer(fig)
 
 
+def interval_check_to_int(nb_intervals):
+    """
+    Check if the interval is a valid integer
+
+    :param nb_intervals: The interval check to check
+    :return: The interval check as an integer
+    """
+    try:
+        nb_intervals = int(nb_intervals)
+        if nb_intervals < 1:
+            raise ValueError
+    except ValueError:
+        return Response('Invalid interval', 400)
+
+    return nb_intervals
+
+
+def graph_type_check(graph_type, graph_types=None):
+    """
+    Check if the graph type is a valid string
+
+    :param graph_type: The graph type to check
+    :param graph_types: The list of valid graph types
+    :return: The graph type as a string
+    """
+    if graph_types is None:
+        graph_types = ['all', 'bar', 'pie', 'curve', 'histogram', 'tree_map']
+
+    try:
+        graph_type = str(graph_type)
+        if graph_type not in graph_types:
+            raise ValueError
+    except ValueError:
+        return Response('Invalid graph type', 400)
+
+    return graph_type
+
+
 @app.route('/graph/size/static', methods=['GET'])
-@app.route('/graph/size/static/<nb_intervals>', methods=['GET'])
-@app.route('/graph/size/static/<interval_size>', methods=['GET'])
 @app.route('/graph/size/static/<interval_size>/<nb_intervals>', methods=['GET'])
 def graph_images_size_static(interval_size=3000, nb_intervals=2):
     """
@@ -426,13 +462,16 @@ def graph_images_size_static(interval_size=3000, nb_intervals=2):
     :param interval_size: The size of the intervals
     :param nb_intervals: The number of intervals
     """
-
+    # Get the metadata
     df_meta = get_metadata()
+
+    # Check intervals value
+    nb_intervals = interval_check_to_int(nb_intervals)
+
     try:
         interval_size = int(interval_size)
-        nb_intervals = int(nb_intervals)
     except ValueError:
-        return 'Invalid interval size or number of intervals', 400
+        return 'Invalid interval size', 400
 
     # Calculate the minimum size of each image and store it in a new column
     df_meta['min_size'] = df_meta[['ImageWidth', 'ImageHeight']].min(axis=1)
@@ -470,20 +509,12 @@ def graph_images_size_dynamic(nb_intervals=7, graph_type='all'):
     :param nb_intervals: The number of intervals in the graph
     :param graph_type: The type of graph to display (bar, pie or all for both)
     """
-
+    # Get the metadata
     df_meta = get_metadata()
 
-    try:
-        nb_intervals = int(nb_intervals)
-    except ValueError:
-        return Response('Invalid number of intervals', 400)
-
-    try:
-        graph_type = str(graph_type)
-        if graph_type not in ['bar', 'pie', 'all']:
-            raise ValueError
-    except ValueError:
-        return Response('Invalid graph type', 400)
+    # check values
+    nb_intervals = interval_check_to_int(nb_intervals)
+    graph_type = graph_type_check(graph_type)
 
     # Calculate the minimum size of each image and store it in a new column
     df_meta['min_size'] = df_meta[['ImageHeight', 'ImageWidth']].min(axis=1)
@@ -523,7 +554,7 @@ def graph_images_size_dynamic(nb_intervals=7, graph_type='all'):
         bar_buffer = display_bar(title=title, x_label=x_label, y_label=y_label,
                                  x_values=size_counts.index, y_values=size_counts.values)
         pie_buffer = display_pie(title=title, values=size_counts.values, labels=size_counts.index)
-        merged_buffer = merge_images_from_buffers(bar_buffer, pie_buffer)
+        merged_buffer = merge_buffers_to_img(bar_buffer, pie_buffer)
 
         return Response(merged_buffer.getvalue(), mimetype='image/png')
 
@@ -531,24 +562,21 @@ def graph_images_size_dynamic(nb_intervals=7, graph_type='all'):
         return Response("Invalid graph type", 400)
 
 
-@app.route('/graph/datetime', methods=['GET'])
-@app.route('/graph/datetime/<graph_type>', methods=['GET'])
-@app.route('/graph/datetime/<nb_intervals>', methods=['GET'])
-@app.route('/graph/datetime/<nb_intervals>/<graph_type>', methods=['GET'])
-def graph_images_datetime(nb_intervals=10, graph_type='all'):
+@app.route('/graph/year', methods=['GET'])
+@app.route('/graph/year/<nb_intervals>/<graph_type>', methods=['GET'])
+def graph_images_year(nb_intervals=10, graph_type='all'):
     """
     Graph the number of images per year
 
     :param graph_type: The type of graph to display (bar, pie, curve or all for all)
     :param nb_intervals: The number of intervals to display
     """
+    # Get the metadata
     df_meta = get_metadata()
 
-    try:
-        nb_intervals = int(nb_intervals)
-        graph_type = str(graph_type)
-    except ValueError:
-        return 'Invalid number of intervals or graph type', 400
+    # Check the values
+    graph_type = graph_type_check(graph_type)
+    nb_intervals = interval_check_to_int(nb_intervals)
 
     # Extract year from the 'DateTime' column and create a new 'Year' column
     df_meta['Year'] = pd.DatetimeIndex(df_meta['DateTimeOriginal']).year
@@ -567,44 +595,48 @@ def graph_images_datetime(nb_intervals=10, graph_type='all'):
     if graph_type == 'bar':
         # Display a bar chart
         image_count.plot(kind='bar', x='Year', y='count')
-        return display_bar(title=title, x_label=x_label, y_label=y_label, x_values=image_count['Year'],
-                           y_values=image_count['count'])
+        buffer = display_bar(title=title, x_label=x_label, y_label=y_label, x_values=image_count['Year'],
+                             y_values=image_count['count'])
+        return Response(buffer.getvalue(), mimetype='image/png')
 
     elif graph_type == 'pie':
         # Display a pie chart using a custom function 'display_pie'
-        return display_pie(title=title, values=image_count['count'], labels=image_count['Year'])
+        buffer = display_pie(title=title, values=image_count['count'], labels=image_count['Year'])
+        return Response(buffer.getvalue(), mimetype='image/png')
 
     elif graph_type == 'curve':
         # Display a line chart using a custom function 'display_curve'
         image_count = df_meta.groupby('Year').size().reset_index(name='count').sort_values('Year', ascending=True)
-        return display_curve(title=title, x_label=x_label, y_label=y_label, x_values=image_count['Year'],
-                             y_values=image_count['count'])
+        buffer = display_curve(title=title, x_label=x_label, y_label=y_label, x_values=image_count['Year'],
+                               y_values=image_count['count'])
+        return Response(buffer.getvalue(), mimetype='image/png')
 
     elif graph_type == 'all':
         # Display all three types of graphs: bar, pie, and line charts
 
         # Bar chart
         image_count.plot(kind='bar', x='Year', y='count')
-        bar = display_bar(title=title, x_label=x_label, y_label=y_label, x_values=image_count['Year'],
-                          y_values=image_count['count'])
+        buffer_bar = display_bar(title=title, x_label=x_label, y_label=y_label, x_values=image_count['Year'],
+                                 y_values=image_count['count'])
 
         # Pie chart
-        pie = display_pie(title=title, values=image_count['count'], labels=image_count['Year'])
+        buffer_pie = display_pie(title=title, values=image_count['count'], labels=image_count['Year'])
 
         # Line chart
         image_count = image_count.sort_values('Year', ascending=True)
-        line = display_curve(title=title, x_label=x_label, y_label=y_label, x_values=image_count['Year'],
-                             y_values=image_count['count'])
+        buffer_line = display_curve(title=title, x_label=x_label, y_label=y_label, x_values=image_count['Year'],
+                                    y_values=image_count['count'])
 
-        return bar, pie, line
+        # Merge the three graphs into one image
+        merged_buffer = merge_buffers_to_img(buffer_bar, buffer_pie, buffer_line)
+
+        return Response(merged_buffer.getvalue(), mimetype='image/png')
     else:
         # Raise an error if an invalid 'graph_type' parameter is passed
-        raise ValueError('Invalid graph type')
+        return Response("Invalid graph type", 400)
 
 
 @app.route('/graph/brand', methods=['GET'])
-@app.route('/graph/brand/<graph_type>', methods=['GET'])
-@app.route('/graph/brand/<nb_columns>', methods=['GET'])
 @app.route('/graph/brand/<nb_columns>/<graph_type>', methods=['GET'])
 def graph_images_brand(graph_type='all', nb_columns=5):
     """
@@ -613,7 +645,12 @@ def graph_images_brand(graph_type='all', nb_columns=5):
     :param graph_type: The type of graph to display (bar, pie or all for both)
     :param nb_columns: The number of columns to display
     """
+    # Get the metadata
     df_meta = get_metadata()
+
+    # Check the values
+    graph_type = graph_type_check(graph_type)
+    nb_columns = interval_check_to_int(nb_columns)
 
     # Initialize an empty dictionary to store the counts of each brand
     counts = {}
@@ -637,25 +674,32 @@ def graph_images_brand(graph_type='all', nb_columns=5):
     # Determine which type of graph to display based on the 'graph_type' parameter
     if graph_type == 'bar':
         # Display a bar graph
-        return display_bar(title=title, x_label=x_label, y_label=y_label, x_values=labels, y_values=values)
+        buffer = display_bar(title=title, x_label=x_label, y_label=y_label, x_values=labels, y_values=values)
+        return Response(buffer.getvalue(), mimetype='image/png')
     elif graph_type == 'pie':
         # Display a pie chart
-        return display_pie(title=title, values=values, labels=labels)
+        buffer = display_pie(title=title, values=values, labels=labels)
+        return Response(buffer.getvalue(), mimetype='image/png')
     elif graph_type == 'all':
         # Display both a bar graph and a pie chart
-        bar = display_bar(title=title, x_label=x_label, y_label=y_label, x_values=labels, y_values=values)
-        pie = display_pie(title=title, values=values, labels=labels)
-        return bar, pie
+        buffer_bar = display_bar(title=title, x_label=x_label, y_label=y_label, x_values=labels, y_values=values)
+        buffer_pie = display_pie(title=title, values=values, labels=labels)
+
+        # Merge the two graphs into one image
+        merged_buffer = merge_buffers_to_img(buffer_bar, buffer_pie)
+        return Response(merged_buffer.getvalue(), mimetype='image/png')
+
     else:
         # Raise an error if the 'graph_type' parameter is invalid
-        raise ValueError('Invalid graph type')
+        return Response("Invalid graph type", 400)
 
 
-def get_coordinates(df_meta):
+def get_coordinates(df_meta, country=False):
     """
     Extract the coordinates of the images with GPS data
 
     :param df_meta: The metadata to extract the coordinates from
+    :param country: Whether to get the country information or not
     """
     coords = {}
     for file, lattitude, longitude, altitude in zip(
@@ -668,7 +712,10 @@ def get_coordinates(df_meta):
                 and longitude is not None and not np.isnan(longitude):
             coords.update({file: [lattitude, longitude, altitude]})
 
-    return get_country(coords)
+    if country:
+        return get_country(coords)
+    else:
+        return coords
 
 
 def get_country(coordinates):
@@ -697,18 +744,16 @@ def get_country(coordinates):
 
 
 @app.route('/graph/gps/map', methods=['GET'])
-@app.route('/graph/gps/map/<output_type>', methods=['GET'])
-def display_coordinates_on_map(output_type='html'):
+def display_coordinates_on_map():
     """
     Display the coordinates on a map
 
-    :param output_type: The output type (either 'html' or 'png')
     :return: The map with the coordinates displayed as markers
     """
 
     df_meta = get_metadata()
 
-    coordinates_list = get_coordinates(df_meta)
+    coordinates_list = get_coordinates(df_meta, False)
 
     # create a map centered at a specific location
     m = folium.Map(location=[0, 0], zoom_start=1)
@@ -718,34 +763,16 @@ def display_coordinates_on_map(output_type='html'):
         lat, lon, alt = coords
         folium.Marker(location=[lat, lon], tooltip=image, popup=f'file:{image}\ncoord:{coords}').add_to(m)
 
-    # Export the map to the desired output type
-    if output_type == 'html':
-        # Save the map to an HTML file
-        html_map = m._repr_html_()
-        with open('map.html', 'w') as f:
-            f.write(html_map)
+    # Export the map
+    buffer = io.BytesIO()
+    m.save(buffer)
 
-        # Read the HTML file contents
-        with open('map.html', 'rb') as f:
-            html_bytes = f.read()
-
-        # Return the HTML file contents as a response
-        return Response(html_bytes, mimetype='text/html')
-    elif output_type == 'png':
-        # Save the map to an in-memory buffer
-        buffer = io.BytesIO()
-        m.save(buffer)
-
-        # Return the buffer contents as a response
-        return Response(buffer.getvalue(), mimetype='image/png')
-    else:
-        raise ValueError("Invalid output_type. Must be 'html' or 'png'.")
+    # Return the buffer contents as a response
+    return Response(buffer.getvalue(), mimetype='image/png')
 
 
 @app.route('/graph/gps/continent', methods=['GET'])
-@app.route('/graph/gps/continent/<graph>', methods=['GET'])
-@app.route('/graph/gps/continent/<int:nb_inter>', methods=['GET'])
-@app.route('/graph/gps/continent/<graph>/<int:nb_inter>', methods=['GET'])
+@app.route('/graph/gps/continent/<int:nb_inter>/<graph>', methods=['GET'])
 def graph_images_countries(nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by country
@@ -754,7 +781,10 @@ def graph_images_countries(nb_inter=5, graph='all'):
     :param graph: type of graph to display (bar, pie, all)
     """
     df_meta = get_metadata()
-    coord_list = get_coordinates(df_meta)
+    coord_list = get_coordinates(df_meta, True)
+
+    graph = graph_type_check(graph)
+    nb_inter = interval_check_to_int(nb_inter)
 
     # Create a pandas DataFrame from the coordinates dictionary
     df = pd.DataFrame.from_dict(coord_list, orient='index',
@@ -769,26 +799,34 @@ def graph_images_countries(nb_inter=5, graph='all'):
     y_label = 'Image Count'
 
     if graph == 'bar':
-        return display_bar(title=title, x_label=x_label, y_label=y_label, x_values=country_count.index,
-                           y_values=country_count.values)
+        buffer = display_bar(title=title, x_label=x_label, y_label=y_label,
+                             x_values=country_count.index, y_values=country_count.values)
+        return Response(buffer.getvalue(), mimetype='image/png')
     elif graph == 'pie':
-        return display_pie(title=title, values=country_count.values, labels=country_count.index)
+        buffer = display_pie(title=title, values=country_count.values, labels=country_count.index)
+        return Response(buffer.getvalue(), mimetype='image/png')
     else:
-        bar = display_bar(title=title, x_label=x_label, y_label=y_label, x_values=country_count.index,
-                          y_values=country_count.values)
-        pie = display_pie(title=title, values=country_count.values, labels=country_count.index)
-        return bar, pie
+        buffer_bar = display_bar(title=title, x_label=x_label, y_label=y_label,
+                                 x_values=country_count.index, y_values=country_count.values)
+        buffer_pie = display_pie(title=title, values=country_count.values, labels=country_count.index)
+        # Merge the two buffers into a single buffer
+        combined_buffer = merge_buffers_to_img(buffer_bar, buffer_pie)
+        return Response(combined_buffer.getvalue(), mimetype='image/png')
 
 
 @app.route('/graph/gps/altitude', methods=['GET'])
-def graph_images_altitudes(coord_list, nb_inter=5, graph='all'):
+def graph_images_altitudes(nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by altitude.
 
-    :param coord_list: list of coordinates
     :param nb_inter: number of interval
     :param graph: type of graph to display (histogram, pie, all)
     """
+    df_meta = get_metadata()
+    coord_list = get_coordinates(df_meta, False)
+
+    graph = graph_type_check(graph)
+    nb_inter = interval_check_to_int(nb_inter)
 
     altitudes = []
     for img in coord_list:
@@ -817,16 +855,24 @@ def graph_images_altitudes(coord_list, nb_inter=5, graph='all'):
     y_label = 'Image Count'
 
     if graph == 'histogram':
-        return display_histogram(title=title, x_label=x_label, y_label=y_label, x_values=altitudes, bins=nb_inter)
+        buffer = display_histogram(title=title, x_label=x_label, y_label=y_label, x_values=altitudes, bins=nb_inter)
+        return Response(buffer.getvalue(), mimetype='image/png')
     elif graph == 'pie':
-        return display_pie(title=title, values=counts, labels=noms_intervalles)
+        buffer = display_pie(title=title, values=counts, labels=noms_intervalles)
+        return Response(buffer.getvalue(), mimetype='image/png')
     elif graph == 'bar':
-        return display_bar(title=title, x_label=x_label, y_label=y_label, x_values=noms_intervalles, y_values=counts)
+        buffer = display_bar(title=title, x_label=x_label, y_label=y_label, x_values=noms_intervalles, y_values=counts)
+        return Response(buffer.getvalue(), mimetype='image/png')
     else:
-        histo = display_histogram(title=title, x_label=x_label, y_label=y_label, x_values=altitudes, bins=nb_inter)
-        bar = display_bar(title=title, x_label=x_label, y_label=y_label, x_values=noms_intervalles, y_values=counts)
-        pie = display_pie(title=title, values=counts, labels=noms_intervalles)
-        return histo, bar, pie
+        buffer_histo = display_histogram(title=title, x_label=x_label, y_label=y_label, x_values=altitudes,
+                                         bins=nb_inter)
+        buffer_bar = display_bar(title=title, x_label=x_label, y_label=y_label, x_values=noms_intervalles,
+                                 y_values=counts)
+        buffer_pie = display_pie(title=title, values=counts, labels=noms_intervalles)
+
+        # Merge the three buffers into a single one
+        combined_buffer = merge_buffers_to_img(buffer_histo, buffer_bar, buffer_pie)
+        return Response(combined_buffer.getvalue(), mimetype='image/png')
 
 
 def closest_colour(requested_colour):
@@ -862,18 +908,20 @@ def get_colour_name(requested_colour):
 
 
 @app.route('/graph/dominant_color', methods=['GET'])
-@app.route('/graph/dominant_color/<graph>', methods=['GET'])
-@app.route('/graph/dominant_color/<nb_inter>', methods=['GET'])
 @app.route('/graph/dominant_color/<nb_inter>/<graph>', methods=['GET'])
-def graph_dominant_colors(nb_inter=5, graph='all'):
+def graph_dominant_colors(nb_inter=20, graph='all'):
     """
     Display graphs about the number of images by dominant color
 
     :param nb_inter: number of interval
     :param graph: type of graph to display (bar, pie, treemap, all)
     """
-
+    # Get the metadata
     df_meta = get_metadata()
+
+    # Check the parameters
+    graph = graph_type_check(graph)
+    nb_inter = interval_check_to_int(nb_inter)
 
     # Create a dictionary of dominant colors
     dict_dom_color = {}
@@ -931,23 +979,24 @@ def graph_dominant_colors(nb_inter=5, graph='all'):
     y_label = 'Percentage'
 
     if graph == 'bar':
-        return display_bar(title=title, x_label=x_label, y_label=y_label, colors=top_colors.keys(),
-                           x_values=top_colors.keys(), y_values=top_colors.values())
+        buffer = display_bar(title=title, x_label=x_label, y_label=y_label, colors=top_colors.keys(),
+                             x_values=top_colors.keys(), y_values=top_colors.values())
     elif graph == 'pie':
-        return display_pie(title=title, values=top_colors.values(), labels=top_colors.keys(), colors=color_labels)
+        buffer = display_pie(title=title, values=top_colors.values(), labels=top_colors.keys(), colors=color_labels)
     elif graph == 'treemap':
-        return display_tree_map(title=title, sizes=sizes, labels=color_labels, colors=color, alpha=.7)
+        buffer = display_tree_map(title=title, sizes=sizes, labels=color_labels, colors=color, alpha=.7)
     else:
-        bar = display_bar(title=title, x_label=x_label, y_label=y_label, colors=top_colors.keys(),
-                          x_values=top_colors.keys(), y_values=top_colors.values())
-        pie = display_pie(title=title, values=top_colors.values(), labels=top_colors.keys(), colors=color_labels)
-        treemap = display_tree_map(title=title, sizes=sizes, labels=color_labels, colors=color, alpha=.7)
-        return bar, pie, treemap
+        buffer_bar = display_bar(title=title, x_label=x_label, y_label=y_label, colors=top_colors.keys(),
+                                 x_values=top_colors.keys(), y_values=top_colors.values())
+        buffer_pie = display_pie(title=title, values=top_colors.values(), labels=top_colors.keys(), colors=color_labels)
+        buffer_treemap = display_tree_map(title=title, sizes=sizes, labels=color_labels, colors=color, alpha=.7)
+
+        # combine the 3 graphs
+        combined_buffer = merge_buffers_to_img(buffer_bar, buffer_pie, buffer_treemap)
+        return Response(combined_buffer.getvalue(), mimetype='image/png')
 
 
 @app.route('/graph/tags/top', methods=['GET'])
-@app.route('/graph/tags/top/<graph>', methods=['GET'])
-@app.route('/graph/tags/top/<nb_inter>', methods=['GET'])
 @app.route('/graph/tags/top/<nb_inter>/<graph>', methods=['GET'])
 def graph_top_tags(nb_inter=5, graph='all'):
     """
@@ -956,8 +1005,12 @@ def graph_top_tags(nb_inter=5, graph='all'):
     :param nb_inter: number of interval
     :param graph: type of graph to display (bar, pie, treemap, all)
     """
-
+    # get the metadata
     df_meta = get_metadata()
+
+    # Check the parameters
+    graph = graph_type_check(graph)
+    nb_inter = interval_check_to_int(nb_inter)
 
     all_tags = []
     for tags in df_meta['tags']:
@@ -1021,13 +1074,22 @@ def categorize_tags(df_meta, categories_list: list):
 
 
 @app.route('/graph/tags/dendrogram/<categories_list>', methods=['GET'])
-def graph_categorized_tags(categories_list: list):
+def graph_categorized_tags(categories_list):
     """
     Display a Dendrogram of categorized tags
 
     :param categories_list: list of categories
     """
+    # get the metadata
     df_meta = get_metadata()
+
+    # Check the parameters
+    try:
+        categories_list = eval(categories_list)
+        if not isinstance(categories_list, list):
+            raise ValueError
+    except ValueError:
+        return Response("Error: categories_list must be a list (e.g. ['cat', 'dog', 'other'])", status=400)
 
     categorized_tags = categorize_tags(df_meta, categories_list)
 
