@@ -4,6 +4,7 @@ projet.iml
 .vscode
 output/images
 output/config
+output/include
 output/.DS_Store
 */.ipynb_checkpoints
 .DS_Store
