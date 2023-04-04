@@ -1,0 +1,7 @@
+flask==2.2.3
+mysql-connector-python==8.0.32
+tqdm==4.65.0
+scikit-learn==1.2.2
+spacy==3.5.1
+pandas==1.5.3
+python-dotenv==1.0.0
