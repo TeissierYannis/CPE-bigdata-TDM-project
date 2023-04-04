@@ -23,7 +23,5 @@ EXPOSE 4003
 # Set the environment variable for Flask
 ENV FLASK_APP=app.py
 
-RUN pip install timm
-
 # Start the Flask app when the container launches
 CMD sleep 10 && flask run --host=0.0.0.0 --port=4003

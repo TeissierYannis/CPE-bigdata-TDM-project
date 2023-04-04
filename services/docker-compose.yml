@@ -7,7 +7,7 @@ services:
   gateway:
     build: ./gateway
     ports:
-      - "80:80"
+      - "81:80"
     depends_on:
       - gather
       - harvest
@@ -58,6 +58,23 @@ services:
       default:
         aliases:
           - harvest
+  visualize:
+    build: ./visualize
+    depends_on:
+      - db
+      - tools
+    environment:
+      SQL_HOST: db
+      SQL_USER: bigdatauser
+      SQL_PASSWORD: bigdatapassword
+      SQL_DATABASE: bigdata
+      SQL_PORT: 3306
+    volumes:
+      - ./shared:/app/shared # Replace the shared_volume volume with a host directory
+    networks:
+      default:
+        aliases:
+          - visualize
   recommend:
     build: ./recommend
     depends_on:

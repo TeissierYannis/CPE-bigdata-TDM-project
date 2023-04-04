@@ -231,9 +231,9 @@ def get_metadata():
     :return: A JSON object with the metadata
     """
     # Check if the metadata file already exists
-    if os.path.isfile('mon_dataframe.csv'):
+    if os.path.isfile('metadata.csv'):
         # If the file exists, read it
-        return pd.read_csv('mon_dataframe.csv')
+        return pd.read_csv('metadata.csv')
     else:
         # Get the metadata from the database
         brut_metadata = get_metadata_from_mariadb_db(sql_database, sql_user, sql_password, sql_host)
@@ -244,14 +244,9 @@ def get_metadata():
         # Fill the 'Make' property NaN values with 'Undefined'
         df_metadata['Make'].fillna('Undefined', inplace=True)
 
-        df_metadata.to_csv(metadata_path + '/metadata.csv')
+        df_metadata.to_csv('metadata.csv', index=False, mode='w')
 
-        # If the function is called into the code, return the DataFrame
-        if request.method is None:
-            return df_metadata
-        else :
-            # If the function is called from the API, return the DataFrame as a JSON object
-            return df_metadata.to_json(orient='index')
+    return df_metadata.to_json(orient='index')
 
 
 def display_bar(title, x_label, y_label, x_values, y_values, colors=None, rotation=90):
@@ -391,12 +386,12 @@ def display_tree_map(title, sizes, labels, colors, alpha=0.6):
     return Response(buffer.getvalue(), mimetype='image/png')
 
 
-@app.route('/graph/size', methods=['POST'])
+@app.route('/graph/size', methods=['GET'])
 def graph_images_size(df_meta, nb_intervals=7, graph_type='all'):
     return graph_images_size_dynamic(df_meta, nb_intervals, graph_type)
 
 
-@app.route('/graph/size/static', methods=['POST'])
+@app.route('/graph/size/static', methods=['GET'])
 def graph_images_size_static(interval_size=200, nb_intervals=4):
     """
     Graph the number of images per size category
@@ -430,7 +425,7 @@ def graph_images_size_static(interval_size=200, nb_intervals=4):
                        x_values=size_counts.index, y_values=size_counts.values)
 
 
-@app.route('/graph/size/dynamic', methods=['POST'])
+@app.route('/graph/size/dynamic', methods=['GET'])
 def graph_images_size_dynamic(nb_intervals=7, graph_type='all'):
     """
     Graph the number of images per size category
@@ -481,7 +476,7 @@ def graph_images_size_dynamic(nb_intervals=7, graph_type='all'):
         raise ValueError('Invalid graph type')
 
 
-@app.route('/graph/datetime', methods=['POST'])
+@app.route('/graph/datetime', methods=['GET'])
 def graph_images_datetime(nb_intervals=10, graph_type='all'):
     """
     Graph the number of images per year
@@ -543,7 +538,7 @@ def graph_images_datetime(nb_intervals=10, graph_type='all'):
         raise ValueError('Invalid graph type')
 
 
-@app.route('/graph/brand', methods=['POST'])
+@app.route('/graph/brand', methods=['GET'])
 def graph_images_brand(graph_type='all', nb_columns=5):
     """
     Graph the number of images per brand
@@ -634,7 +629,7 @@ def get_country(coordinates):
     return coordinates
 
 
-@app.route('graph/gps/map', methods=['POST'])
+@app.route('/graph/gps/map', methods=['GET'])
 def display_coordinates_on_map(output_type='html'):
     """
     Display the coordinates on a map
@@ -679,7 +674,7 @@ def display_coordinates_on_map(output_type='html'):
         raise ValueError("Invalid output_type. Must be 'html' or 'png'.")
 
 
-@app.route('graph/gps/continent', methods=['POST'])
+@app.route('/graph/gps/continent', methods=['GET'])
 def graph_images_countries(nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by country
@@ -714,7 +709,7 @@ def graph_images_countries(nb_inter=5, graph='all'):
         return bar, pie
 
 
-@app.route('graph/gps/altitude', methods=['POST'])
+@app.route('/graph/gps/altitude', methods=['GET'])
 def graph_images_altitudes(coord_list, nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by altitude.
@@ -795,7 +790,7 @@ def get_colour_name(requested_colour):
     return actual_name, closest_name
 
 
-@app.route('graph/dominant_color', methods=['POST'])
+@app.route('/graph/dominant_color', methods=['GET'])
 def graph_dominant_colors(nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by dominant color
@@ -876,7 +871,7 @@ def graph_dominant_colors(nb_inter=5, graph='all'):
         return bar, pie, treemap
 
 
-@app.route('graph/tags/top', methods=['POST'])
+@app.route('/graph/tags/top', methods=['GET'])
 def graph_top_tags(nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by tags
@@ -948,10 +943,10 @@ def categorize_tags(df_meta, categories_list: list):
     return categories
 
 
-@app.route('graph/tags/dendrogram', methods=['POST'])
+@app.route('/graph/tags/dendrogram', methods=['GET'])
 def graph_categorized_tags(categories_list: list):
     """
-    Display a Denrogram of categorized tags
+    Display a Dendrogram of categorized tags
 
     :param categories_list: list of categories
     """
@@ -989,3 +984,7 @@ def graph_categorized_tags(categories_list: list):
 
     # Return the buffer contents as a response
     return Response(buffer.getvalue(), mimetype='image/png')
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
