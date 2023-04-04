@@ -9,13 +9,14 @@ import collections
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from PIL import Image
 import mysql.connector
 from dotenv import load_dotenv
 from collections import Counter
 import matplotlib.pyplot as plt
 from geopy.geocoders import Nominatim
 from scipy.spatial.distance import pdist
-from flask import Flask, Response, request
+from flask import Flask, Response, request, make_response, render_template
 from scipy.cluster.hierarchy import dendrogram, linkage
 
 load_dotenv()
@@ -224,16 +225,15 @@ def clean_metadata(metadata_to_clean):
     return cln_meta
 
 
-@app.route('/metadata', methods=['GET'])
 def get_metadata():
     """
     Get the metadata from the database
     :return: A JSON object with the metadata
     """
     # Check if the metadata file already exists
-    if os.path.isfile('mon_dataframe.csv'):
+    if os.path.isfile('metadata.csv'):
         # If the file exists, read it
-        return pd.read_csv('mon_dataframe.csv')
+        return pd.read_csv('metadata.csv')
     else:
         # Get the metadata from the database
         brut_metadata = get_metadata_from_mariadb_db(sql_database, sql_user, sql_password, sql_host)
@@ -244,14 +244,68 @@ def get_metadata():
         # Fill the 'Make' property NaN values with 'Undefined'
         df_metadata['Make'].fillna('Undefined', inplace=True)
 
-        df_metadata.to_csv(metadata_path + '/metadata.csv')
+        df_metadata.to_csv('metadata.csv', index=False, mode='w')
 
-        # If the function is called into the code, return the DataFrame
-        if request.method is None:
-            return df_metadata
-        else :
-            # If the function is called from the API, return the DataFrame as a JSON object
-            return df_metadata.to_json(orient='index')
+        return df_metadata
+
+
+def fig_to_buffer(fig):
+    """
+    Convert a figure to a buffer
+
+    :param fig: The figure to convert
+    :return: The buffer
+    """
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png')
+    buf.seek(0)
+
+    return buf
+
+
+def merge_images_from_buffers(*buffers, max_columns=2):
+    """
+    Merge images from buffers
+    It will merge the images from the buffers into a single image.
+    The images will be merged in a grid with a maximum number of columns.
+    The images will be resized to fit the grid.
+
+    :param buffers: The buffers containing the images to merge
+    :param max_columns: The maximum number of columns
+    :return: The buffer containing the merged image
+    """
+    # Define some constants
+    IMAGE_FORMAT = 'RGB'
+    MARGIN = 10
+
+    # Open all the images from the buffers
+    images = [Image.open(buffer) for buffer in buffers]
+
+    # Calculate the new size for the merged image
+    max_height = max(image.height for image in images)
+    columns = min(len(images), max_columns)
+    rows = (len(images) + columns - 1) // columns
+    new_width = columns * (images[0].width + MARGIN) - MARGIN
+    new_height = rows * (max_height + MARGIN) - MARGIN
+
+    # Create a new blank image with the new size
+    merged_image = Image.new(IMAGE_FORMAT, (new_width, new_height), color='white')
+
+    # Paste the original images onto the new image
+    x, y = 0, 0
+    for image in images:
+        merged_image.paste(image, (x, y))
+        x += image.width + MARGIN
+        if x >= columns * (images[0].width + MARGIN):
+            x = 0
+            y += max_height + MARGIN
+
+    # Save the merged image to a new buffer
+    merged_buffer = io.BytesIO()
+    merged_image.save(merged_buffer, format='PNG')
+    merged_buffer.seek(0)
+
+    return merged_buffer
 
 
 def display_bar(title, x_label, y_label, x_values, y_values, colors=None, rotation=90):
@@ -274,13 +328,7 @@ def display_bar(title, x_label, y_label, x_values, y_values, colors=None, rotati
     ax.set_ylabel(y_label)
     ax.set_xticklabels(x_values, rotation=rotation)
 
-    # Save the plot to a buffer
-    buffer = io.BytesIO()
-    fig.savefig(buffer, format='png')
-    buffer.seek(0)
-
-    # Return the buffer contents as a response
-    return Response(buffer.getvalue(), mimetype='image/png')
+    return fig_to_buffer(fig)
 
 
 def display_pie(title, values, labels, colors=None, autopct="%1.1f%%", legend_title=None, legend_loc=None,
@@ -303,13 +351,7 @@ def display_pie(title, values, labels, colors=None, autopct="%1.1f%%", legend_ti
         ax.legend(title=legend_title, loc=legend_loc, bbox_to_anchor=legend_margin)
     ax.set_title(title)
 
-    # Save the plot to a buffer
-    buffer = io.BytesIO()
-    fig.savefig(buffer, format='png')
-    buffer.seek(0)
-
-    # Return the buffer contents as a response
-    return Response(buffer.getvalue(), mimetype='image/png')
+    return fig_to_buffer(fig)
 
 
 def display_curve(title, x_label, y_label, x_values, y_values, rotation=90):
@@ -331,13 +373,7 @@ def display_curve(title, x_label, y_label, x_values, y_values, rotation=90):
     ax.set_ylabel(y_label)
     ax.set_title(title)
 
-    # Save the plot to a buffer
-    buffer = io.BytesIO()
-    fig.savefig(buffer, format='png')
-    buffer.seek(0)
-
-    # Return the buffer contents as a response
-    return Response(buffer.getvalue(), mimetype='image/png')
+    return fig_to_buffer(fig)
 
 
 def display_histogram(title, x_label, y_label, x_values, bins=10, rotation=90):
@@ -359,13 +395,7 @@ def display_histogram(title, x_label, y_label, x_values, bins=10, rotation=90):
     ax.set_ylabel(y_label)
     ax.set_title(title)
 
-    # Save the plot to a buffer
-    buffer = io.BytesIO()
-    fig.savefig(buffer, format='png')
-    buffer.seek(0)
-
-    # Return the buffer contents as a response
-    return Response(buffer.getvalue(), mimetype='image/png')
+    return fig_to_buffer(fig)
 
 
 def display_tree_map(title, sizes, labels, colors, alpha=0.6):
@@ -382,31 +412,27 @@ def display_tree_map(title, sizes, labels, colors, alpha=0.6):
     squarify.plot(sizes=sizes, label=labels, color=colors, alpha=alpha, ax=ax)
     ax.set_title(title)
 
-    # Save the plot to a buffer
-    buffer = io.BytesIO()
-    fig.savefig(buffer, format='png')
-    buffer.seek(0)
-
-    # Return the buffer contents as a response
-    return Response(buffer.getvalue(), mimetype='image/png')
+    return fig_to_buffer(fig)
 
 
-@app.route('/graph/size', methods=['POST'])
-def graph_images_size(df_meta, nb_intervals=7, graph_type='all'):
-    return graph_images_size_dynamic(df_meta, nb_intervals, graph_type)
-
-
-@app.route('/graph/size/static', methods=['POST'])
-def graph_images_size_static(interval_size=200, nb_intervals=4):
+@app.route('/graph/size/static', methods=['GET'])
+@app.route('/graph/size/static/<nb_intervals>', methods=['GET'])
+@app.route('/graph/size/static/<interval_size>', methods=['GET'])
+@app.route('/graph/size/static/<interval_size>/<nb_intervals>', methods=['GET'])
+def graph_images_size_static(interval_size=3000, nb_intervals=2):
     """
     Graph the number of images per size category
-    The interval size is 200 by default
 
     :param interval_size: The size of the intervals
     :param nb_intervals: The number of intervals
     """
 
     df_meta = get_metadata()
+    try:
+        interval_size = int(interval_size)
+        nb_intervals = int(nb_intervals)
+    except ValueError:
+        return 'Invalid interval size or number of intervals', 400
 
     # Calculate the minimum size of each image and store it in a new column
     df_meta['min_size'] = df_meta[['ImageWidth', 'ImageHeight']].min(axis=1)
@@ -426,11 +452,16 @@ def graph_images_size_static(interval_size=200, nb_intervals=4):
     # Count the number of images in each category
     size_counts = df_meta['size_category'].value_counts()
 
-    return display_bar(title='Number of images per size category', x_label='Size category', y_label='Number of images',
-                       x_values=size_counts.index, y_values=size_counts.values)
+    buffer = display_bar(title='Number of images per size category', x_label='Size category',
+                         y_label='Number of images',
+                         x_values=size_counts.index, y_values=size_counts.values)
+
+    return Response(buffer.getvalue(), mimetype='image/png')
 
 
-@app.route('/graph/size/dynamic', methods=['POST'])
+@app.route('/graph/size', methods=['GET'])
+@app.route('/graph/size/dynamic', methods=['GET'])
+@app.route('/graph/size/dynamic/<nb_intervals>/<graph_type>', methods=['GET'])
 def graph_images_size_dynamic(nb_intervals=7, graph_type='all'):
     """
     Graph the number of images per size category
@@ -441,6 +472,18 @@ def graph_images_size_dynamic(nb_intervals=7, graph_type='all'):
     """
 
     df_meta = get_metadata()
+
+    try:
+        nb_intervals = int(nb_intervals)
+    except ValueError:
+        return Response('Invalid number of intervals', 400)
+
+    try:
+        graph_type = str(graph_type)
+        if graph_type not in ['bar', 'pie', 'all']:
+            raise ValueError
+    except ValueError:
+        return Response('Invalid graph type', 400)
 
     # Calculate the minimum size of each image and store it in a new column
     df_meta['min_size'] = df_meta[['ImageHeight', 'ImageWidth']].min(axis=1)
@@ -468,20 +511,30 @@ def graph_images_size_dynamic(nb_intervals=7, graph_type='all'):
 
     # Create the appropriate chart based on the graph type parameter
     if graph_type == 'bar':
-        return display_bar(title=title, x_label=x_label, y_label=y_label, x_values=size_counts.index,
-                           y_values=size_counts.values)
+        buffer = display_bar(title=title, x_label=x_label, y_label=y_label,
+                             x_values=size_counts.index, y_values=size_counts.values)
+        return Response(buffer.getvalue(), mimetype='image/png')
+
     elif graph_type == 'pie':
-        return display_pie(title=title, values=size_counts.values, labels=size_counts.index)
+        buffer = display_pie(title=title, values=size_counts.values, labels=size_counts.index)
+        return Response(buffer.getvalue(), mimetype='image/png')
+
     elif graph_type == 'all':
-        bar = display_bar(title=title, x_label=x_label, y_label=y_label, x_values=size_counts.index,
-                          y_values=size_counts.values)
-        pie = display_pie(title=title, values=size_counts.values, labels=size_counts.index)
-        return bar, pie
+        bar_buffer = display_bar(title=title, x_label=x_label, y_label=y_label,
+                                 x_values=size_counts.index, y_values=size_counts.values)
+        pie_buffer = display_pie(title=title, values=size_counts.values, labels=size_counts.index)
+        merged_buffer = merge_images_from_buffers(bar_buffer, pie_buffer)
+
+        return Response(merged_buffer.getvalue(), mimetype='image/png')
+
     else:
-        raise ValueError('Invalid graph type')
+        return Response("Invalid graph type", 400)
 
 
-@app.route('/graph/datetime', methods=['POST'])
+@app.route('/graph/datetime', methods=['GET'])
+@app.route('/graph/datetime/<graph_type>', methods=['GET'])
+@app.route('/graph/datetime/<nb_intervals>', methods=['GET'])
+@app.route('/graph/datetime/<nb_intervals>/<graph_type>', methods=['GET'])
 def graph_images_datetime(nb_intervals=10, graph_type='all'):
     """
     Graph the number of images per year
@@ -490,6 +543,12 @@ def graph_images_datetime(nb_intervals=10, graph_type='all'):
     :param nb_intervals: The number of intervals to display
     """
     df_meta = get_metadata()
+
+    try:
+        nb_intervals = int(nb_intervals)
+        graph_type = str(graph_type)
+    except ValueError:
+        return 'Invalid number of intervals or graph type', 400
 
     # Extract year from the 'DateTime' column and create a new 'Year' column
     df_meta['Year'] = pd.DatetimeIndex(df_meta['DateTimeOriginal']).year
@@ -543,7 +602,10 @@ def graph_images_datetime(nb_intervals=10, graph_type='all'):
         raise ValueError('Invalid graph type')
 
 
-@app.route('/graph/brand', methods=['POST'])
+@app.route('/graph/brand', methods=['GET'])
+@app.route('/graph/brand/<graph_type>', methods=['GET'])
+@app.route('/graph/brand/<nb_columns>', methods=['GET'])
+@app.route('/graph/brand/<nb_columns>/<graph_type>', methods=['GET'])
 def graph_images_brand(graph_type='all', nb_columns=5):
     """
     Graph the number of images per brand
@@ -634,7 +696,8 @@ def get_country(coordinates):
     return coordinates
 
 
-@app.route('graph/gps/map', methods=['POST'])
+@app.route('/graph/gps/map', methods=['GET'])
+@app.route('/graph/gps/map/<output_type>', methods=['GET'])
 def display_coordinates_on_map(output_type='html'):
     """
     Display the coordinates on a map
@@ -679,7 +742,10 @@ def display_coordinates_on_map(output_type='html'):
         raise ValueError("Invalid output_type. Must be 'html' or 'png'.")
 
 
-@app.route('graph/gps/continent', methods=['POST'])
+@app.route('/graph/gps/continent', methods=['GET'])
+@app.route('/graph/gps/continent/<graph>', methods=['GET'])
+@app.route('/graph/gps/continent/<int:nb_inter>', methods=['GET'])
+@app.route('/graph/gps/continent/<graph>/<int:nb_inter>', methods=['GET'])
 def graph_images_countries(nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by country
@@ -714,7 +780,7 @@ def graph_images_countries(nb_inter=5, graph='all'):
         return bar, pie
 
 
-@app.route('graph/gps/altitude', methods=['POST'])
+@app.route('/graph/gps/altitude', methods=['GET'])
 def graph_images_altitudes(coord_list, nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by altitude.
@@ -795,7 +861,10 @@ def get_colour_name(requested_colour):
     return actual_name, closest_name
 
 
-@app.route('graph/dominant_color', methods=['POST'])
+@app.route('/graph/dominant_color', methods=['GET'])
+@app.route('/graph/dominant_color/<graph>', methods=['GET'])
+@app.route('/graph/dominant_color/<nb_inter>', methods=['GET'])
+@app.route('/graph/dominant_color/<nb_inter>/<graph>', methods=['GET'])
 def graph_dominant_colors(nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by dominant color
@@ -876,7 +945,10 @@ def graph_dominant_colors(nb_inter=5, graph='all'):
         return bar, pie, treemap
 
 
-@app.route('graph/tags/top', methods=['POST'])
+@app.route('/graph/tags/top', methods=['GET'])
+@app.route('/graph/tags/top/<graph>', methods=['GET'])
+@app.route('/graph/tags/top/<nb_inter>', methods=['GET'])
+@app.route('/graph/tags/top/<nb_inter>/<graph>', methods=['GET'])
 def graph_top_tags(nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by tags
@@ -948,10 +1020,10 @@ def categorize_tags(df_meta, categories_list: list):
     return categories
 
 
-@app.route('graph/tags/dendrogram', methods=['POST'])
+@app.route('/graph/tags/dendrogram/<categories_list>', methods=['GET'])
 def graph_categorized_tags(categories_list: list):
     """
-    Display a Denrogram of categorized tags
+    Display a Dendrogram of categorized tags
 
     :param categories_list: list of categories
     """
@@ -989,3 +1061,7 @@ def graph_categorized_tags(categories_list: list):
 
     # Return the buffer contents as a response
     return Response(buffer.getvalue(), mimetype='image/png')
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
