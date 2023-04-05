@@ -1,5 +1,6 @@
 import os
 import io
+import time
 import spacy
 import folium
 import datetime
@@ -14,10 +15,11 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from PIL import Image
 from dotenv import load_dotenv
+from selenium import webdriver
 from collections import Counter
-from flask import Flask, Response
 from geopy.geocoders import Nominatim
 from scipy.spatial.distance import pdist
+from flask import Flask, Response, request
 from scipy.cluster.hierarchy import dendrogram, linkage
 
 load_dotenv()
@@ -648,6 +650,9 @@ def graph_images_brand(graph_type='all', nb_columns=5):
     # Get the metadata
     df_meta = get_metadata()
 
+    # Fill the missing values with 'Undefined'
+    df_meta['Make'].fillna('Undefined', inplace=True)
+
     # Check the values
     graph_type = graph_type_check(graph_type)
     nb_columns = interval_check_to_int(nb_columns)
@@ -743,6 +748,34 @@ def get_country(coordinates):
     return coordinates
 
 
+import os
+import folium
+import base64
+from io import BytesIO
+from flask import Flask, Response
+from selenium import webdriver
+
+
+def folium_map_to_png(map):
+    # Save the folium map to an HTML file
+    map.save('temp_map.html')
+
+    # Set up the browser driver (use the appropriate driver for your browser)
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_argument('--headless')
+    driver = webdriver.Chrome(executable_path='path/to/chromedriver', options=chrome_options)
+
+    # Open the HTML file in the browser and take a screenshot
+    driver.get('file://' + os.path.abspath('temp_map.html'))
+    png = driver.get_screenshot_as_png()
+
+    # Close the browser and remove the temporary HTML file
+    driver.quit()
+    os.remove('temp_map.html')
+
+    return png
+
+
 @app.route('/graph/gps/map', methods=['GET'])
 def display_coordinates_on_map():
     """
@@ -763,12 +796,10 @@ def display_coordinates_on_map():
         lat, lon, alt = coords
         folium.Marker(location=[lat, lon], tooltip=image, popup=f'file:{image}\ncoord:{coords}').add_to(m)
 
-    # Export the map
-    buffer = io.BytesIO()
-    m.save(buffer)
+    # Convert the folium map to a PNG image
+    img_data = folium_map_to_png(m)
 
-    # Return the buffer contents as a response
-    return Response(buffer.getvalue(), mimetype='image/png')
+    return Response(img_data, mimetype='image/png')
 
 
 @app.route('/graph/gps/continent', methods=['GET'])
@@ -1046,8 +1077,12 @@ def categorize_tags(df_meta, categories_list: list):
     # Concatène toutes les listes de tags
     all_tags = []
     for tags in df_meta['tags']:
-        if tags is not None and tags is not np.nan:
-            all_tags += tags
+        try:
+            tags = eval(tags)
+            if tags is not None and tags is not np.nan:
+                all_tags += tags
+        except:
+            print("Error : ", tags)
 
     # Load pre-trained word embedding model
     nlp = spacy.load("en_core_web_lg")
@@ -1073,23 +1108,25 @@ def categorize_tags(df_meta, categories_list: list):
     return categories
 
 
-@app.route('/graph/tags/dendrogram/<categories_list>', methods=['GET'])
-def graph_categorized_tags(categories_list):
+@app.route('/graph/tags/dendrogram', methods=['GET'])
+def graph_categorized_tags():
     """
     Display a Dendrogram of categorized tags
-
-    :param categories_list: list of categories
     """
     # get the metadata
     df_meta = get_metadata()
 
-    # Check the parameters
-    try:
-        categories_list = eval(categories_list)
-        if not isinstance(categories_list, list):
-            raise ValueError
-    except ValueError:
-        return Response("Error: categories_list must be a list (e.g. ['cat', 'dog', 'other'])", status=400)
+    # list of categories
+    categories_list = request.args.get('list')
+    print("list : " + str(categories_list))
+
+    if categories_list is None or categories_list == '':
+        print("No list of categories provided, using default list")
+        # default list of categories
+        categories_list = [
+            'Fruit', 'Animal', 'Electronics', 'Furniture', 'Vehicle',
+            'Clothing', 'Sport', 'Kitchen', 'Outdoor', 'Accessory'
+        ]
 
     categorized_tags = categorize_tags(df_meta, categories_list)
 
