@@ -1,6 +1,6 @@
 import asyncio
-import base64
 import imghdr
+import io
 
 import aiohttp
 import os
@@ -9,6 +9,7 @@ from typing import List
 from flask import Flask, jsonify, request, Response
 import threading
 from .classes import sharedprogress
+from PIL import Image
 
 app = Flask(__name__)
 
@@ -249,10 +250,20 @@ def show(filename):
     if not imghdr.what(file_path):
         return {'status': 'error', 'message': 'File is not an image'}
 
+    # Save image to buffer and return it
+    buffer = io.BytesIO()
+    img = Image.open(file_path)
+    img.save(buffer, format='JPEG')
+    buffer.seek(0)
+    return Response(buffer.getvalue(), mimetype='image/jpeg')
+
+
+
     # Send image as base64 encoded string
-    with open(file_path, "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read())
-    return {'status': 'success', 'message': 'Image shown', 'image': encoded_string.decode('utf-8')}
+    #with open(file_path, "rb") as image_file:
+    #    encoded_string = base64.b64encode(image_file.read())
+
+    #return {'status': 'success', 'message': 'Image shown', 'image': encoded_string.decode('utf-8')}
 
 
 # Used to download the file from the server

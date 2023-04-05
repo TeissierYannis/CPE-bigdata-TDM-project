@@ -145,10 +145,11 @@ curl -X POST \
 ```
 
 ```bash
-curl -X POST \
+curl -X GET \
     -H "Content-Type: application/json" \
     -d '{
-    "tags": "cat"
+    "tags": "cat",
+    "dominant_color": ""
     }' \
 http://127.0.0.1:80/recommend/recommend
 
