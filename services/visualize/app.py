@@ -15,11 +15,10 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from PIL import Image
 from dotenv import load_dotenv
-from selenium import webdriver
 from collections import Counter
 from geopy.geocoders import Nominatim
 from scipy.spatial.distance import pdist
-from flask import Flask, Response, request
+from flask import Flask, Response, request, send_file
 from scipy.cluster.hierarchy import dendrogram, linkage
 
 load_dotenv()
@@ -748,40 +747,10 @@ def get_country(coordinates):
     return coordinates
 
 
-import os
-import folium
-import base64
-from io import BytesIO
-from flask import Flask, Response
-from selenium import webdriver
-
-
-def folium_map_to_png(map):
-    # Save the folium map to an HTML file
-    map.save('temp_map.html')
-
-    # Set up the browser driver (use the appropriate driver for your browser)
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument('--headless')
-    driver = webdriver.Chrome(executable_path='path/to/chromedriver', options=chrome_options)
-
-    # Open the HTML file in the browser and take a screenshot
-    driver.get('file://' + os.path.abspath('temp_map.html'))
-    png = driver.get_screenshot_as_png()
-
-    # Close the browser and remove the temporary HTML file
-    driver.quit()
-    os.remove('temp_map.html')
-
-    return png
-
-
 @app.route('/graph/gps/map', methods=['GET'])
 def display_coordinates_on_map():
     """
     Display the coordinates on a map
-
-    :return: The map with the coordinates displayed as markers
     """
 
     df_meta = get_metadata()
@@ -796,10 +765,10 @@ def display_coordinates_on_map():
         lat, lon, alt = coords
         folium.Marker(location=[lat, lon], tooltip=image, popup=f'file:{image}\ncoord:{coords}').add_to(m)
 
-    # Convert the folium map to a PNG image
-    img_data = folium_map_to_png(m)
+    # Save map to HTML
+    m.save('map.html')
 
-    return Response(img_data, mimetype='image/png')
+    return send_file('map.html', mimetype='text/html')
 
 
 @app.route('/graph/gps/continent', methods=['GET'])
@@ -1117,16 +1086,15 @@ def graph_categorized_tags():
     df_meta = get_metadata()
 
     # list of categories
-    categories_list = request.args.get('list')
-    print("list : " + str(categories_list))
+    categories_list = request.get_json().get('list')
 
     if categories_list is None or categories_list == '':
         print("No list of categories provided, using default list")
-        # default list of categories
-        categories_list = [
-            'Fruit', 'Animal', 'Electronics', 'Furniture', 'Vehicle',
-            'Clothing', 'Sport', 'Kitchen', 'Outdoor', 'Accessory'
-        ]
+    # default list of categories
+    categories_list = [
+        'Fruit', 'Animal', 'Electronics', 'Furniture', 'Vehicle',
+        'Clothing', 'Sport', 'Kitchen', 'Outdoor', 'Accessory'
+    ]
 
     categorized_tags = categorize_tags(df_meta, categories_list)
 
