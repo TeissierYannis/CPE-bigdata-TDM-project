@@ -255,25 +255,25 @@ def extract_labels():
         labels[image_name] = detect_with_transformers(image)
         image.close()
 
+    # Create the folder if it doesn't exist
+    subprocess.call(['mkdir', '-p', metadata_path])
     # Save labels to csv file
     with open(metadata_path + '/labels.csv', 'w') as f:
         # add header
-        f.write("filename,value\n")
+        f.write("filename|value\n")
         for key in labels.keys():
-            f.write("%s,%s\n" % (key, labels[key]))
+            f.write("%s|%s\n" % (key, labels[key]))
 
     # return success message as response
-    return jsonify({'message': 'Labels extracted successfully'})
+    return jsonify({'message': 'Labels extracted successfully', 'labels': labels})
 
 
 @app.route('/labels/save', methods=['GET'])
 def save_labels():
     # first read labels from csv file and convert it to pandas dataframe
-    labels = pd.read_csv(metadata_path + '/labels.csv', error_bad_lines=False)
-    # convert dataframe to dataframe with columns filename, key, value
-    labels = pd.melt(labels, id_vars=['filename'], value_name='value')
+    labels = pd.read_csv(metadata_path + '/labels.csv', error_bad_lines=False, sep='|')
 
-    # save labels to database (mariadb)
+# save labels to database (mariadb)
     conn = mysql.connector.connect(**cnf)
     # disable auto commit
     conn.autocommit = False

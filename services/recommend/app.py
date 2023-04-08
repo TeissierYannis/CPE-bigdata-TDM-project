@@ -1,12 +1,12 @@
 import os
 
+import pandas as pd
 from flask import Flask, jsonify, request
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
 from mysql.connector import pooling
 from dotenv import load_dotenv
 from collections import namedtuple
 import ast
+import numpy as np
 
 load_dotenv()
 
@@ -26,11 +26,7 @@ connection_pool = pooling.MySQLConnectionPool(pool_name="mypool",
                                               **cnf)
 
 ImageProperties = namedtuple(
-    'ImageProperties', ['name', 'hex_color', 'tags', 'make', 'orientation', 'width', 'height', 'distance']
-)
-
-UserPreferences = namedtuple(
-    'UserPreferences', ['dominant_color', 'tags', 'Make', 'Orientation', 'ImageWidth', 'ImageHeight']
+    'ImageProperties', ['name', 'hex_color', 'tags', 'make', 'orientation', 'width', 'height']
 )
 
 
@@ -77,8 +73,7 @@ def get_metadata_from_mariadb_as_imageproperties():
                 make=metadata_dict.get('Make', None),
                 orientation=metadata_dict.get('Orientation', None),
                 width=metadata_dict.get('ImageWidth', None),
-                height=metadata_dict.get('ImageHeight', None),
-                distance=0
+                height=metadata_dict.get('ImageHeight', None)
             )
 
             # Add the ImageProperties object to the list
@@ -89,165 +84,232 @@ def get_metadata_from_mariadb_as_imageproperties():
     return images
 
 
-def hex_to_rgb(hex_color):
-    return tuple(int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+def clean(data):
+    """
+    :param data: DataFrame
+    :return:
+    """
+    # 1. first, get only the first hex_color
+    # 2. Convert each column to the right type of data
+    # 2. Remove rows with missing values
+
+    data['hex_color'] = data['hex_color'].apply(lambda x: x[0] if len(x) > 0 else None)
+    data['width'] = pd.to_numeric(data['width'], errors='coerce')
+    data['height'] = pd.to_numeric(data['height'], errors='coerce')
+    data['orientation'] = pd.to_numeric(data['orientation'], errors='coerce')
+
+    data = data.dropna()
+
+    return data
 
 
-def preprocess_data(data):
-    for image in data:
-        image_tags = " ".join(image.tags)
-        avg_rgb_color = np.mean([hex_to_rgb(color) for color in image.hex_color], axis=0)
-        try:
-            make_len = len(image.make)
-        except TypeError:
-            make_len = 0
+def preprocess(data):
+    # 1. Normalize and scale numerical properties
+    # Width and Height: scale to [0, 1] by dividing each value by the maximum value
+    # Hex colors: Convert hex colors to RGB values in the range 0-255 and normalize it by dividing by 255 (range [0, 1])
 
-        try:
-            width = int(image.width)
-        except TypeError:
-            width = 0
+    data['width'] = data['width'] / data['width'].max()
+    data['height'] = data['height'] / data['height'].max()
 
-        try:
-            height = int(image.height)
-        except TypeError:
-            height = 0
+    # Convert hex color to RGB and normalize
+    # Remove # from hex color
+    data["hex_color"] = data["hex_color"].apply(lambda x: x[1:])
+    data["rgb_color"] = data["hex_color"].apply(lambda x: tuple(int(x[i:i + 2], 16) for i in (0, 2, 4)))
+    data[["r", "g", "b"]] = pd.DataFrame(data["rgb_color"].tolist(), index=data.index) / 255
+    data.drop(["hex_color", "rgb_color"], axis=1, inplace=True)
 
-        try:
-            orientation = int(image.orientation)
-        except:
-            orientation = 0
+    # One-hot encode categorical properties
+    # 1. tags, make, orientation
+    data = pd.concat([data, pd.get_dummies(data["tags"].apply(pd.Series).stack()).sum(level=0)], axis=1)
+    data = pd.concat([data, pd.get_dummies(data["make"], prefix="make")], axis=1)
+    data["landscape"] = data["orientation"].apply(lambda x: 1 if x == 0 else 0)
+    data["portrait"] = data["orientation"].apply(lambda x: 1 if x == 1 else 0)
+    data.drop(["tags", "make", "orientation"], axis=1, inplace=True)
 
-        avg_rgb_color_list = avg_rgb_color.tolist() if hasattr(avg_rgb_color, 'tolist') else [avg_rgb_color]
-
-        try:
-            yield np.array([
-                *avg_rgb_color_list,  # Ensure avg_rgb_color is an iterable before unpacking
-                len(image_tags),
-                make_len,
-                orientation,
-                width,
-                height,
-                0
-            ])
-        except:
-            pass
+    return data
 
 
-def user_preferences_vector(preferences: UserPreferences):
-    preference_vector = []
+from sklearn.model_selection import train_test_split
+import gym
+import numpy as np
+from gym import spaces
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from stable_baselines3 import DQN
+from stable_baselines3.dqn import MlpPolicy
+from stable_baselines3.common.vec_env import DummyVecEnv
+from sklearn.metrics.pairwise import cosine_similarity
 
-    if preferences.dominant_color:
-        try:
-            dominant_color = hex_to_rgb(preferences.dominant_color)
-        except:
-            dominant_color = (255, 255, 255)
-        preference_vector.extend(dominant_color)
+@app.route('/recommend', methods=['GET'])
+def recommend():
+    raw_image_properties = get_metadata_from_mariadb_as_imageproperties()
+    # Save raw image properties to a file named raw_image_properties.csv in the shared folder
+    pd.DataFrame(raw_image_properties).to_csv('./shared/raw_image_properties.csv', index=False, sep="|")
 
-    if preferences.tags:
-        tags = " ".join(preferences.tags)
-        preference_vector.append(len(tags))
+    # read csv file
+    df = pd.read_csv('./shared/raw_image_properties.csv', sep="|")
 
-    if preferences.Make:
-        make_len = len(preferences.Make)
-        preference_vector.append(make_len)
+    # Convert the list of ImageProperties objects to a pandas DataFrame
+    df = pd.DataFrame(raw_image_properties)
 
-    if preferences.Orientation is not None:
-        try:
-            orientation = int(preferences.Orientation)
-        except:
-            orientation = 0
-        preference_vector.append(orientation)
+    clean_image_properties = clean(df)
+    processed_image_properties = preprocess(clean_image_properties)
 
-    if preferences.ImageWidth is not None:
-        try:
-            width = int(preferences.ImageWidth)
-        except:
-            width = 0
-        preference_vector.append(width)
+    # Create feature vectors (numpy array)
+    feature_vectors = processed_image_properties.drop(["name"], axis=1).values
 
-    if preferences.ImageHeight is not None:
-        try:
-            height = int(preferences.ImageHeight)
-        except:
-            height = 0
-        preference_vector.append(height)
+    # Combine the feature vectors with the image names in a new DataFrame
+    data_with_features = processed_image_properties[['name']].copy()
+    data_with_features['features'] = list(feature_vectors)
 
-    return np.array(preference_vector)
+    # Split the dataset into training (70%) and the remaining 30%
+    train_data, temp_data = train_test_split(data_with_features, test_size=0.3, random_state=42)
 
+    # Split the remaining data into validation (15%) and test (15%) sets
+    validation_data, test_data = train_test_split(temp_data, test_size=0.5, random_state=42)
 
-def recommend_images(preferences, data, top_n=0):
-    preprocessed_data = np.array(list(preprocess_data(data)))
-    user_vector = user_preferences_vector(preferences)
+    env = ImageRecommenderEnvironment(data_with_features)
+    env = DummyVecEnv([lambda: ImageRecommenderEnvironment(data_with_features)])
 
-    preference_mask = create_preference_mask(preferences)
-    similarity_matrix = masked_cosine_similarity(user_vector, preprocessed_data, preference_mask)
+    input_dim = env.observation_space.shape[0]
+    output_dim = env.action_space.n
 
-    # if top_n is 0, return all images
-    if top_n == 0:
-        top_n = len(data)
-
-    for i, image in enumerate(data):
-        data[i] = image._replace(distance=similarity_matrix[0][i + 1])
-
-    # sort the data by distance
-    data.sort(key=lambda x: x.distance, reverse=True)
-
-    # return the top_n images
-    return data[:top_n]
-
-
-def create_preference_mask(preferences: UserPreferences):
-    mask = []
-    if preferences.dominant_color:
-        mask.extend([True] * 3)  # RGB
-    if preferences.tags:
-        mask.append(True)
-    if preferences.Make:
-        mask.append(True)
-    if preferences.Orientation is not None:
-        mask.append(True)
-    if preferences.ImageWidth is not None and preferences.ImageHeight is not None:
-        mask.extend([True] * 2)  # Width and Height
-    return mask
-
-def masked_cosine_similarity(user_vector, data, mask):
-    masked_user_vector = user_vector[mask]
-    masked_data = data[:, mask]
-    return cosine_similarity(np.vstack([masked_user_vector, masked_data]))
-
-
-@app.route("/recommend", methods=['GET'])
-def test():
-    data = get_metadata_from_mariadb_as_imageproperties()
-
-    # Get preferences from the user
-    preferences = request.get_json()
-
-    # Validate the preferences
-    if not preferences:
-        return jsonify({'error': 'No preferences provided'}), 400
-
-    # get the preferences from the request
-    preferences = request.get_json()
-    # valid preferences are Make, ImageWidth, ImageHeight, Orientation, dominant_color, tags
-    user_preference = UserPreferences(
-        Make=preferences.get('Make', None),
-        ImageWidth=preferences.get('ImageWidth', None),
-        ImageHeight=preferences.get('ImageHeight', None),
-        Orientation=preferences.get('Orientation', None),
-        dominant_color=preferences.get('dominant_color', None),
-        tags=preferences.get('tags', None)
+    policy_kwargs = dict(
+        features_extractor_class=CustomDQNNetwork,
+        features_extractor_kwargs=dict(input_dim=input_dim, output_dim=output_dim)
     )
 
-    # Check if there is only one width or height and if yes, set the width = to the height or vice versa
-    if user_preference.ImageWidth and not user_preference.ImageHeight:
-        user_preference.ImageHeight = user_preference.ImageWidth
-    elif user_preference.ImageHeight and not user_preference.ImageWidth:
-        user_preference.ImageWidth = user_preference.ImageHeight
+    agent = DQN(MlpPolicy, env, policy_kwargs=policy_kwargs, verbose=1)
 
-    # Test the recommender system
-    recommended_images = recommend_images(user_preference, data, top_n=10)
-    return jsonify(recommended_images)
+    total_timesteps = 50000  # Adjust this value based on the problem and computational resources
+    agent.learn(total_timesteps=total_timesteps)
+
+    # Save the trained agent
+    #agent.save("dqn_agent.pkl")
+
+    # Load the trained agent
+    #agent = DQN.load("dqn_agent.pkl")
+
+    # Create validation and test environments
+    validation_env = DummyVecEnv([lambda: ImageRecommenderEnvironment(validation_data)])
+    test_env = DummyVecEnv([lambda: ImageRecommenderEnvironment(test_data)])
+
+    # Evaluate the agent on the validation and test sets
+    num_validation_episodes = 100
+    num_test_episodes = 100
+
+    validation_reward = evaluate_agent(agent, validation_env, num_validation_episodes)
+    test_reward = evaluate_agent(agent, test_env, num_test_episodes)
+
+    print(f"Validation reward: {validation_reward}")
+    print(f"Test reward: {test_reward}")
+
+    # Precision = TP / (TP + FP)
+    # Recall = TP / (TP + FN)
+    # F1-score = 2 * (Precision * Recall) / (Precision + Recall)
+
+
+    return jsonify(
+        {
+            'status': 'success',
+            'message': 'Recommendation successful',
+            'data': {
+                'validation_reward': validation_reward,
+                'test_reward': test_reward,
+                "precision": "NaN",
+                "recall": "NaN",
+                "f1_score": "NaN"
+            }
+        }
+    )
+
+
+class ImageRecommenderEnvironment(gym.Env):
+    def __init__(self, data_with_features):
+        super(ImageRecommenderEnvironment, self).__init__()
+
+        self.data = data_with_features
+        self.current_state = None
+
+        # Define action space as the indices of the images
+        self.action_space = spaces.Discrete(len(self.data))
+
+        # Define state space as the feature vectors
+        feature_vector_length = len(self.data['features'].iloc[0])
+        self.observation_space = spaces.Box(low=0, high=1, shape=(feature_vector_length,), dtype=np.float32)
+
+    def reset(self):
+        # Reset the environment to an initial state
+        self.current_state = self._get_initial_state()
+        return self.current_state
+
+    def step(self, action):
+        # Execute the given action and observe the next state and reward
+        next_state, reward = self._get_next_state_and_reward(action)
+
+        # Check if the episode is done
+        done = self._is_done(next_state)
+
+        # Update the current state
+        self.current_state = next_state
+
+        return next_state, reward, done, {}
+
+    def render(self, mode='human'):
+        # Render the current state of the environment (optional)
+        pass
+
+    def _get_initial_state(self):
+        # Implement a method to generate an initial state
+        pass
+
+    def _get_next_state_and_reward(self, action):
+        # Implement a method to get the next state and reward based on the action taken
+        pass
+
+    def _is_done(self, next_state):
+        # Implement a method to check if the episode is done
+        pass
+
+
+class CustomDQNNetwork(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(CustomDQNNetwork, self).__init__()
+
+        self.network = nn.Sequential(
+            nn.Linear(input_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, output_dim)
+        )
+
+    def forward(self, x):
+        return self.network(x)
+
+
+def reward_function(user_preferences, recommended_image_features):
+    similarities = cosine_similarity(user_preferences, recommended_image_features)
+    return similarities.mean()
+
+def evaluate_agent(agent, env, num_episodes):
+    total_rewards = []
+
+    for episode in range(num_episodes):
+        state = env.reset()
+        done = False
+        episode_reward = 0
+
+        while not done:
+            action, _ = agent.predict(state, deterministic=True)
+            next_state, reward, done, _ = env.step(action)
+            episode_reward += reward
+            state = next_state
+
+        total_rewards.append(episode_reward)
+
+    return np.mean(total_rewards)
 
 
 if __name__ == '__main__':
