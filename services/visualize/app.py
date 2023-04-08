@@ -1,5 +1,6 @@
 import os
 import io
+import time
 import spacy
 import folium
 import datetime
@@ -15,9 +16,9 @@ from tqdm import tqdm
 from PIL import Image
 from dotenv import load_dotenv
 from collections import Counter
-from flask import Flask, Response
 from geopy.geocoders import Nominatim
 from scipy.spatial.distance import pdist
+from flask import Flask, Response, request, send_file
 from scipy.cluster.hierarchy import dendrogram, linkage
 
 load_dotenv()
@@ -648,6 +649,9 @@ def graph_images_brand(graph_type='all', nb_columns=5):
     # Get the metadata
     df_meta = get_metadata()
 
+    # Fill the missing values with 'Undefined'
+    df_meta['Make'].fillna('Undefined', inplace=True)
+
     # Check the values
     graph_type = graph_type_check(graph_type)
     nb_columns = interval_check_to_int(nb_columns)
@@ -747,8 +751,6 @@ def get_country(coordinates):
 def display_coordinates_on_map():
     """
     Display the coordinates on a map
-
-    :return: The map with the coordinates displayed as markers
     """
 
     df_meta = get_metadata()
@@ -763,12 +765,10 @@ def display_coordinates_on_map():
         lat, lon, alt = coords
         folium.Marker(location=[lat, lon], tooltip=image, popup=f'file:{image}\ncoord:{coords}').add_to(m)
 
-    # Export the map
-    buffer = io.BytesIO()
-    m.save(buffer)
+    # Save map to HTML
+    m.save('map.html')
 
-    # Return the buffer contents as a response
-    return Response(buffer.getvalue(), mimetype='image/png')
+    return send_file('map.html', mimetype='text/html')
 
 
 @app.route('/graph/gps/continent', methods=['GET'])
@@ -1046,8 +1046,12 @@ def categorize_tags(df_meta, categories_list: list):
     # Concatène toutes les listes de tags
     all_tags = []
     for tags in df_meta['tags']:
-        if tags is not None and tags is not np.nan:
-            all_tags += tags
+        try:
+            tags = eval(tags)
+            if tags is not None and tags is not np.nan:
+                all_tags += tags
+        except:
+            print("Error : ", tags)
 
     # Load pre-trained word embedding model
     nlp = spacy.load("en_core_web_lg")
@@ -1073,23 +1077,24 @@ def categorize_tags(df_meta, categories_list: list):
     return categories
 
 
-@app.route('/graph/tags/dendrogram/<categories_list>', methods=['GET'])
-def graph_categorized_tags(categories_list):
+@app.route('/graph/tags/dendrogram', methods=['GET'])
+def graph_categorized_tags():
     """
     Display a Dendrogram of categorized tags
-
-    :param categories_list: list of categories
     """
     # get the metadata
     df_meta = get_metadata()
 
-    # Check the parameters
-    try:
-        categories_list = eval(categories_list)
-        if not isinstance(categories_list, list):
-            raise ValueError
-    except ValueError:
-        return Response("Error: categories_list must be a list (e.g. ['cat', 'dog', 'other'])", status=400)
+    # list of categories
+    categories_list = request.get_json().get('list')
+
+    if categories_list is None or categories_list == '':
+        print("No list of categories provided, using default list")
+    # default list of categories
+    categories_list = [
+        'Fruit', 'Animal', 'Electronics', 'Furniture', 'Vehicle',
+        'Clothing', 'Sport', 'Kitchen', 'Outdoor', 'Accessory'
+    ]
 
     categorized_tags = categorize_tags(df_meta, categories_list)
 
