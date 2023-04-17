@@ -15,3 +15,4 @@ pymilvus==2.2.6
 google
 grpcio
 protobuf
+transformers==4.27.4

@@ -51,7 +51,6 @@ engine = create_engine("postgresql://postgres:postgres@postgres:5432/raw_metadat
 processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
 model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50")
 
-
 def detect_with_transformers(image):
     """
     This function detects objects in an image using the DETR (DEtection TRansformer) model by Facebook.
