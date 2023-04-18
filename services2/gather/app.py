@@ -78,6 +78,7 @@ async def download_images(session: aiohttp.ClientSession, urls: List[str]) -> No
     await asyncio.wait(tasks)
     sharedprogress.SharedProgress().set_status('completed')
 
+
 def start_download_task(urls):
     sharedprogress.SharedProgress().reset()
     sharedprogress.SharedProgress().set_status('in progress')
@@ -86,6 +87,7 @@ def start_download_task(urls):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(download_images(aiohttp.ClientSession(), urls))
+
 
 @app.route('/download')
 async def download():

@@ -11,7 +11,6 @@ import numpy as np
 from celery.utils.log import get_task_logger
 import concurrent.futures
 
-
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from transformers import DetrImageProcessor, DetrForObjectDetection
@@ -50,6 +49,7 @@ engine = create_engine("postgresql://postgres:postgres@postgres:5432/raw_metadat
 
 processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
 model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50")
+
 
 def detect_with_transformers(image):
     """

@@ -65,7 +65,7 @@ def connect_to_milvus():
             ],
             description="Collection for metadata vectors",
         )
-        collection = Collection(name=collection_name, schema=schema)
+        Collection(name=collection_name, schema=schema)
 
     # release the collection if is load in memory
     release_collection(collection_name)
