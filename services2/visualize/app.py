@@ -1091,18 +1091,21 @@ def graph_categorized_tags():
     # get the metadata
     df_meta = get_metadata()
 
-    # TODO 400 : http://127.0.0.1:81/visualize/graph/tags/dendrogram
+    # Check if the request body contains JSON data
+    if request.is_json:
+        # Get the list of categories from the request
+        categories_list = request.get_json().get('list')
+    else:
+        categories_list = None
 
-    # list of categories
-    categories_list = request.get_json().get('list')
-
-    if categories_list is None or categories_list == '':
+    # Verify if the categories_list is a list and not empty
+    if categories_list is None or not isinstance(categories_list, list) or len(categories_list) == 0:
         print("No list of categories provided, using default list")
-    # default list of categories
-    categories_list = [
-        'Fruit', 'Animal', 'Electronics', 'Furniture', 'Vehicle',
-        'Clothing', 'Sport', 'Kitchen', 'Outdoor', 'Accessory'
-    ]
+        # default list of categories
+        categories_list = [
+            'Fruit', 'Animal', 'Electronics', 'Furniture', 'Vehicle',
+            'Clothing', 'Sport', 'Kitchen', 'Outdoor', 'Accessory'
+        ]
 
     categorized_tags = categorize_tags(df_meta, categories_list)
 
