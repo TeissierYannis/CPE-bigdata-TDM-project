@@ -9,8 +9,8 @@ const Recommendations = ({ recommendations, setRecommendations }: { recommendati
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {recommendations.map((recommendation, index) => (
                     <div key={index} className="relative aspect-w-1 aspect-h-1">
-                        <Image
-                            src={`http://127.0.0.1:81/gather/show/${recommendation}`}
+                        <img
+                            src={`http://127.0.0.1:4006/show/${recommendation}`}
                             alt={`Recommendation ${index + 1}`}
                             className="rounded-md object-cover inset-0 w-full h-full"
                             width={300}

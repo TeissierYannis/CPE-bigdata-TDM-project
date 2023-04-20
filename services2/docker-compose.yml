@@ -161,8 +161,7 @@ services:
       HARVEST_SERVICE_URL: http://harvest:4002/
       VISUALIZE_SERVICE_URL: http://visualize:4003/
       RECOMMEND_SERVICE_URL: http://recommend:4004/
-      CLIENT_SERVICE_URL: http://client:XXXX/
-      CDN_SERVICE_URL: http://cdn:XXXX/
+      CDN_SERVICE_URL: http://cdn:4006/
     networks:
       default:
         aliases:
@@ -269,10 +268,35 @@ services:
       - preprocess
       - visualize
       - recommend
+    ports:
+      - "4005:4005"
     networks:
       default:
         aliases:
           - client
+
+  cdn:
+    build: ./cdn
+    depends_on:
+      - gateway
+      - gather
+      - harvest
+      - tools
+      - minio
+      - postgres
+      - standalone
+      - milvus-insight
+      - rabbitmq
+      - harvest_worker
+      - preprocess
+      - visualize
+      - recommend
+    ports:
+      - "4006:4006"
+    networks:
+      default:
+        aliases:
+          - cdn
 
 volumes:
   pg_data:

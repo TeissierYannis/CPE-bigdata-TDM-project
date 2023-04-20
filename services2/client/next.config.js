@@ -4,13 +4,13 @@ const nextConfig = {
     appDir: true,
   },
   images: {
-    domains: ['127.0.0.1:81'],
+    domains: ['127.0.0.1'],
     remotePatterns: [
       {
         protocol: 'http',
         hostname: '127.0.0.1',
-        port: "81",
-        pathname: '/gather/show/**',
+        port: "4006",
+        pathname: '/show/**',
       }
     ],
   }

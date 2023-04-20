@@ -5,6 +5,8 @@ import React, {useState} from 'react';
 import Loader from "@/app/components/loader";
 import Recommendations from "@/app/components/recommendations";
 
+const axios = require('axios');
+
 const inter = Inter({subsets: ['latin']});
 
 export default function Home() {
@@ -24,36 +26,31 @@ export default function Home() {
         e.preventDefault();
         console.log(name, hexColor, words, width, height, make);
 
+        // TODO
+        const prefOrientation = 0;
+
         setIsLoading(true);
+        const preferences = {
+            dominant_color: hexColor,
+            imagewidth: width,
+            imageheight: height,
+            orientation: prefOrientation,
+            tags: words,
+            make: make,
+        };
 
-        // set timeout for 20 seconds
-        setTimeout(() => {
-            setIsLoading(false);
-        }, 2000);
-
-
-        try {
-            // Send the data to the backend and wait for the response
-            // ...
-
-            // Update the state based on the response
-            // ...
-
-            const recommendations = [
-                "bda95c47.jpg",
-                "l48Eloe0RGm3l0OQfHNd_13112213395_dbe69fe6de_o.jpg.jpg",
-                "photo-1430826032205-b84a31521ea6.jpg",
-                "photo-1431576882097-3c68310a480f.jpg",
-                "photo-1433018705870-ecc677a093f2.jpg"
-            ];
-
-            setRecommendations(recommendations);
-        } catch (error) {
-            console.error('Error:', error);
-        } finally {
-            setIsLoading(false);
-        }
-
+        axios.post('http://127.0.0.1:81/recommend/recommend', {preferences})
+            .then(function (response: any) {
+                console.log(response.data);
+                // store only values
+                setRecommendations(Object.values(response.data));
+            })
+            .catch(function (error: any) {
+                console.error(error);
+            })
+            .finally(function () {
+                setIsLoading(false);
+            });
     };
 
     const onNext = () => {
@@ -68,6 +65,8 @@ export default function Home() {
     const handleWords = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             e.preventDefault();
+            // if there is more than 5 words, don't add more
+            if (words.length >= 5) return;
             // @ts-ignore
             setWords([...words, currentWord]);
             setCurrentWord('');
