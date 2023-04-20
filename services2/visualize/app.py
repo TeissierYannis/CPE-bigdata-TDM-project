@@ -16,15 +16,16 @@ from PIL import Image
 from dotenv import load_dotenv
 from collections import Counter
 from geopy.geocoders import Nominatim
+from sqlalchemy.orm import sessionmaker
 from scipy.spatial.distance import pdist
+from sqlalchemy import create_engine, text
 from flask import Flask, Response, request, send_file
 from scipy.cluster.hierarchy import dendrogram, linkage
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
 
 app = Flask(__name__)
+
 
 def get_metadata_from_postgres_db():
     """
@@ -1059,7 +1060,7 @@ def categorize_tags(df_meta, categories_list: list):
             print("Error : ", tags)
 
     # Load pre-trained word embedding model
-    nlp = spacy.load("en_core_web_lg")
+    nlp = spacy.load("en_core_web_md")
 
     categories = {}
     for cate in categories_list:

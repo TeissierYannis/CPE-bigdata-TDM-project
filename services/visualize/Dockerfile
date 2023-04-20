@@ -4,7 +4,6 @@ FROM python
 # Set the working directory to /app
 WORKDIR /app
 
-
 # Copy the requirements file into the container
 COPY requirements.txt .
 
@@ -12,7 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install en_core_web_lg model for spaCy
-RUN python -m spacy download en_core_web_lg
+RUN python -m spacy download en_core_web_md
 
 # Copy the rest of the application code into the container
 COPY . .
