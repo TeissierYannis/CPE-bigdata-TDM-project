@@ -985,10 +985,13 @@ def graph_dominant_colors(nb_inter=20, graph='all'):
     if graph == 'bar':
         buffer = display_bar(title=title, x_label=x_label, y_label=y_label, colors=top_colors.keys(),
                              x_values=top_colors.keys(), y_values=top_colors.values())
+        return Response(buffer.getvalue(), mimetype='image/png')
     elif graph == 'pie':
         buffer = display_pie(title=title, values=top_colors.values(), labels=top_colors.keys(), colors=color_labels)
+        return Response(buffer.getvalue(), mimetype='image/png')
     elif graph == 'treemap':
         buffer = display_tree_map(title=title, sizes=sizes, labels=color_labels, colors=color, alpha=.7)
+        return Response(buffer.getvalue(), mimetype='image/png')
     else:
         buffer_bar = display_bar(title=title, x_label=x_label, y_label=y_label, colors=top_colors.keys(),
                                  x_values=top_colors.keys(), y_values=top_colors.values())
@@ -1012,10 +1015,9 @@ def graph_top_tags(nb_inter=5, graph='all'):
     # get the metadata
     df_meta = get_metadata()
 
-    # TODO ERROR 500 http://127.0.0.1:81/visualize/graph/tags/top
-
     # Check the parameters
     graph = graph_type_check(graph)
+
     nb_inter = interval_check_to_int(nb_inter)
 
     all_tags = []
@@ -1030,15 +1032,20 @@ def graph_top_tags(nb_inter=5, graph='all'):
     y_label = 'Count'
 
     if graph == 'bar':
-        return display_bar(title=title, x_label=x_label, y_label=y_label,
-                           x_values=top_tags.keys(), y_values=top_tags.values())
+        buffer = display_bar(title=title, x_label=x_label, y_label=y_label,
+                             x_values=top_tags.keys(), y_values=top_tags.values())
+        return Response(buffer.getvalue(), mimetype='image/png')
     elif graph == 'pie':
-        return display_pie(title=title, values=top_tags.values(), labels=top_tags.keys())
+        buffer = display_pie(title=title, values=top_tags.values(), labels=top_tags.keys())
+        return Response(buffer.getvalue(), mimetype='image/png')
     else:
-        bar = display_bar(title=title, x_label=x_label, y_label=y_label,
-                          x_values=top_tags.keys(), y_values=top_tags.values())
-        pie = display_pie(title=title, values=top_tags.values(), labels=top_tags.keys())
-        return bar, pie
+        buffer_bar = display_bar(title=title, x_label=x_label, y_label=y_label,
+                                 x_values=top_tags.keys(), y_values=top_tags.values())
+        buffer_pie = display_pie(title=title, values=top_tags.values(), labels=top_tags.keys())
+
+        # combine the 2 graphs
+        combined_buffer = merge_buffers_to_img(buffer_bar, buffer_pie)
+        return Response(combined_buffer.getvalue(), mimetype='image/png')
 
 
 def categorize_tags(df_meta, categories_list: list):
