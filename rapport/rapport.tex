@@ -92,16 +92,34 @@
     \section{Data exploration}\label{sec:exploration}
 
     \subsection{Used models}\label{subsec:models}
+    Throughout this project, various models and libraries were employed, both integrated and standalone:
 
-
+    \begin{itemize}
+        \item \textbf{Spacy}: A Python NLP library used for text processing and tag generation.\\It enables similarity association between tags and their categorization.
+        \item \textbf{Mini-batch K-means}: A clustering algorithm utilized for dominant color generation.\\To enhance the algorithm's efficiency, we chose to reduce the image size to 200x200 pixels.\\Additionally, Mini-batch K-means was preferred over the standard K-means algorithm due to its faster performance.
+        \item \textbf{Detr}: An image recognition model used for tag generation.\\Prior to selecting Detr, several attempts were made with other models, such as YoloV3, Google Owlvit, and Detr.\\Google Owlvit and YoloV3 were ultimately rejected due to their high processing time and download requirements.\\Initially, we used Detr with 300 parameters, but for similar reasons, we switched to the 50-parameter version, offering the best balance between processing and download time and accuracy.
+        \item \textbf{Reinforcement Learning}: We have also tried to use Reinforcement Learning to improve the recommendation system using SB3.\\Stable Baselines3 (SB3) is a Python library implementing state-of-the-art Reinforcement Learning (RL) algorithms, aiming to facilitate their use in research and development projects.\\One such algorithm is the Deep Q-Network (DQN), designed for environments with large state and action spaces.\\In this project, the goal was to train an RL model to determine the Euclidean distance between a user's preferences and image vectors in a dataset using DQN.\\However, the reward system was found to be insufficiently relevant and time-consuming, hindering the agent's learning process.\\The problem might have been better addressed using supervised or unsupervised learning approaches instead.\\Consequently, while SB3 and DQN are powerful tools for RL, their effectiveness depends on the quality of the reward system and the suitability of applying RL to the problem at hand.
+    \end{itemize}
 
     \subsection{Obtained metrics}\label{subsec:metrics}
+    \begin{itemize}
+        \item \textbf{Spacy}:
+        \item \textbf{Mini-batch K-means}:
+        \item \textbf{Detr}: Concerning Detr, we use a list of 91 different objects on which the model is trained.\\In particular, it has been trained on COCO 2017 object detection, a dataset consisting of 118k/5k annotated images for training/validation respectively.\\This model achieves an AP (average precision) of 42.0 on COCO 2017 validation.\\Here is the list of recognized objects:\\N/A, person, traffic light, fire hydrant, street sign, stop sign, parking meter, bench, bird, cat, dog, horse, bicycle, sheep, cow, elephant, bear, zebra, giraffe, hat, backpack, umbrella, shoe, car, eye glasses, handbag, tie, suitcase, frisbee, skis, snowboard, sports ball, kite, baseball bat, motorcycle, baseball glove, skateboard, surfboard, tennis racket, bottle, plate, wine glass, cup, fork, knife, airplane, spoon, bowl, banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, bus, donut, cake, chair, couch, potted plant, bed, mirror, dining table, window, desk, train, toilet, door, tv, laptop, mouse, remote, keyboard, cell phone, microwave, oven, truck, toaster, sink, refrigerator, blender, book, clock, vase, scissors, teddy bear, hair drier, boat, toothbrush.
+    \end{itemize}
 
-
-    \section{Auto-evaluation}\label{sec:autoeval}
+    \section{Self-assessment}\label{sec:self_assessment}
+    In terms of self-assessment, we have exceeded expectations for most of our objectives.
+    We successfully implemented a functional recommendation system, complete with a web interface and the most efficient possible databases for storing the data we use.
+    The numerous technologies we have employed and attempted to integrate sometimes involve advanced techniques, always with the aim of providing the most effective solution possible.
+    This is demonstrated in the addition of extra constraints, such as EXIF extraction, automatic image tagging, and the automation of generating all of our metrics, among others.
+    This comprehensive approach makes our project more complete and scientifically interesting.
+    Therefore, we believe that our work stands among the higher tier of projects in this course.
+    Consequently, if a grading were to be assigned, we think our project would be placed in the same high range.
 
 
     \section{Remarques}\label{sec:remarques}
+
 
     \subsection{Séances pratiques}\label{subsec:seances}
 
@@ -122,7 +140,7 @@
 
     \begin{figure}[htbp]
         \centering
-        \includegraphics[width=0.7\textwidth]{targeted_archi}
+        \includegraphics[width=0.8 \textwidth]{targeted_archi}
         \caption{Targeted architecture}
         \label{fig:targeted_architecture}
     \end{figure}
@@ -131,7 +149,7 @@
 
     \begin{figure}[htbp]
         \centering
-        \includegraphics[width=0.7\textwidth]{targeted_archi} % TODO : create the actual one
+        \includegraphics[width=1.2\textwidth]{actual_architecture}
         \caption{Actual architecture}
         \label{fig:actual_architecture}
     \end{figure}
