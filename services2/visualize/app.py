@@ -1056,7 +1056,7 @@ def categorize_tags(df_meta, categories_list: list):
     :param df_meta: DataFrame of metadata
     :return: dictionary of categories
     """
-    # Concatène toutes les listes de tags
+    # Concatenate all tags in a list
     all_tags = []
     for tags in df_meta['tags']:
         try:
