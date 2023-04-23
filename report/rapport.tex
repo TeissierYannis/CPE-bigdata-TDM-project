@@ -8,6 +8,7 @@
 \usepackage{listings}
 \usepackage{graphicx}
 \usepackage{hyperref}
+\usepackage{lstdoc}
 \inputencoding{utf8}
 
 \title{Massive data processing \\ with the Unsplash dataset}
@@ -106,11 +107,13 @@
         \item \textbf{Spacy}: The \("\)en\_core\_web\_md\("\) model, version 3.5.0, is a medium-sized (40 MB) English natural language processing model developed by Explosion and distributed under the MIT license.\\Optimized for CPU performance, it incorporates multiple components to perform various NLP tasks, such as tokenization, part-of-speech tagging, named entity recognition, and lemmatisation.\\The model is pretrained on web-based text data and includes 300-dimensional word vectors.\\Its performance is evaluated in terms of accuracy, recall, and F-score, with a tokenization accuracy of 1.00 and an F-score of 0.85 for named entity recognition.\\This model was chosen over other models offered by spaCy as it provided the best balance between size and performance, given the resources available for our project.
         \item \textbf{Mini-batch K-means}: According to the performance report between K-Means and Mini-batch K-Means available \href{https://upcommons.upc.edu/bitstream/handle/2117/23414/R13-8.pdf}{here}, KMeans generally produces a higher level of cluster coherence, as indicated by smaller intra-cluster distances and higher silhouette scores.\\However, MiniBatchKMeans has a significant advantage in terms of computational efficiency, with shorter processing times and lower memory requirements.\\As such, we decided to use MiniBatchKMeans to promote the processing speed of our model.
         \item \textbf{Detr}: Concerning Detr, we use a list of 91 different objects on which the model is trained.\\In particular, it has been trained on COCO 2017 object detection, a dataset consisting of 118k/5k annotated images for training/validation respectively.\\This model achieves an AP (average precision) of 42.0 on COCO 2017 validation.\\Here is the list of recognized objects:\\N/A, person, traffic light, fire hydrant, street sign, stop sign, parking meter, bench, bird, cat, dog, horse, bicycle, sheep, cow, elephant, bear, zebra, giraffe, hat, backpack, umbrella, shoe, car, eye glasses, handbag, tie, suitcase, frisbee, skis, snowboard, sports ball, kite, baseball bat, motorcycle, baseball glove, skateboard, surfboard, tennis racket, bottle, plate, wine glass, cup, fork, knife, airplane, spoon, bowl, banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, bus, donut, cake, chair, couch, potted plant, bed, mirror, dining table, window, desk, train, toilet, door, tv, laptop, mouse, remote, keyboard, cell phone, microwave, oven, truck, toaster, sink, refrigerator, blender, book, clock, vase, scissors, teddy bear, hair drier, boat, toothbrush.
+        \item \textbf{Visualisation}: The collection of all these data also allowed us to visualize them and to obtain an overall vision of them through the graphs.\\We note in particular that the majority of the images were taken between in 2019 by Canon cameras and enormously in the USA. They were taken in large majority between 0 and 2000m of altitude, often represents people. The colors are mostly black, shades of gray and green.\\You will find some of these representations in Appendix ~~hyperref[subsec:Graphs]{\nameref{subsec:graphs}}.
     \end{itemize}
 
     Thus, in general, these metrics allowed us to guide our choice of models.
     We were able to decide to favor speed of processing and size of models while balancing this with accuracy of results.
     This allows us to offer an optimal user experience, while maintaining a certain accuracy of results.
+
 
     \section{Self-assessment}\label{sec:self_assessment}
     In terms of self-assessment, we have exceeded expectations for most of our objectives.
@@ -145,6 +148,7 @@
     The project being quite substantial, it would have been preferable to reduce its size and clearly define the expected goals.
     Additionally, a thorough review and correction of the project's implementation would have been a plus.
 
+
     \section{Conclusion}\label{sec:conclusion}
 
     In conclusion, we have successfully developed a comprehensive image recommendation system based on the Unsplash dataset, taking into account user preferences.
@@ -168,7 +172,7 @@
 
     \begin{figure}[htbp]
         \centering
-        \includegraphics[width=0.8 \textwidth]{targeted_archi}
+        \includegraphics[width=0.8 \textwidth]{img/targeted_archi}
         \caption{Targeted architecture}
         \label{fig:targeted_architecture}
     \end{figure}
@@ -177,11 +181,114 @@
 
     \begin{figure}[htbp]
         \centering
-        \includegraphics[width=1.2\textwidth]{actual_architecture}
+        \includegraphics[width=1.2\textwidth]{img/actual_architecture}
         \caption{Actual architecture}
         \label{fig:actual_architecture}
     \end{figure}
 
+    \newpage
+
+    \subsection{Graphs}\label{subsec:graphs}
+
+    \subsubsection{static sizes}\label{subsubsec:static_sizes}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.7 \textwidth]{img/size_static}
+        \caption{Sizes}
+        \label{fig:static_sizes}
+    \end{figure}
+
+    \subsubsection{dynamic sizes}\label{subsubsec:dynamic_sizes}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.65 \textwidth]{img/size_dynamic}
+        \caption{Sizes}
+        \label{fig:dynamic_sizes}
+    \end{figure}
+
+    \newpage
+
+
+    \subsubsection{Top years}\label{subsubsec:top_years}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.65 \textwidth]{img/year}
+        \caption{Top years}
+        \label{fig:top_years}
+    \end{figure}
+
+    \subsubsection{Top altitudes}\label{subsubsec:top_altitudes}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.65 \textwidth]{img/altitude}
+        \caption{Top altitudes}
+        \label{fig:top_altitudes}
+    \end{figure}
+
+    \newpage
+
+    \subsubsection{Top countries}\label{subsubsec:top_countries}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=1.1 \textwidth]{img/country}
+        \caption{Top countries}
+        \label{fig:top_countries}
+    \end{figure}
+
+    \subsubsection{Map}\label{subsubsec:map}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=1.1 \textwidth]{img/map}
+        \caption{Map}
+        \label{fig:map}
+    \end{figure}
+
+    \newpage
+
+    \subsubsection{Dominant colors}\label{subsubsec:dominant_colors}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.9 \textwidth]{img/dominant_color}
+        \caption{Top colors}
+        \label{fig:dominant_colors}
+
+    \end{figure}
+
+    \subsubsection{Top brands}\label{subsubsec:top_brands}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.8 \textwidth]{img/brand}
+        \caption{Top brands}
+        \label{fig:top_brands}
+    \end{figure}
+
+    \newpage
+
+    \subsubsection{Top tags}\label{subsubsec:top_tags}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.85 \textwidth]{img/tags}
+        \caption{Top tags}
+        \label{fig:top_tags}
+    \end{figure}
+
+    \subsubsection{Dendrogram}\label{subsubsec:dendrogram}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=1 \textwidth]{img/dendrogram}
+        \caption{Dendrogram}
+        \label{fig:dendrogram}
+    \end{figure}
 
 \end{document}
 
