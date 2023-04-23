@@ -5,3 +5,7 @@ scikit-learn==1.2.2
 spacy==3.5.1
 pandas==1.5.3
 python-dotenv==1.0.0
+stable-baselines3==1.7.0
+gym==0.21
+pymilvus==2.2.6
+transformers==4.27.4

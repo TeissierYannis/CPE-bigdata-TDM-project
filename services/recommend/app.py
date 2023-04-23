@@ -1,4 +1,5 @@
 import os
+import sys
 
 import pandas as pd
 from flask import Flask, jsonify, request
@@ -6,310 +7,210 @@ from mysql.connector import pooling
 from dotenv import load_dotenv
 from collections import namedtuple
 import ast
+from pymilvus import DataType, Collection, CollectionSchema, FieldSchema, connections, utility, IndexType, SearchResult
 import numpy as np
+import logging
+from transformers import PreTrainedTokenizerFast
+from sklearn.preprocessing import OneHotEncoder
 
 load_dotenv()
 
 app = Flask(__name__)
 
-cnf = {
-    'host': os.getenv("SQL_HOST") or 'localhost',
-    'user': os.getenv("SQL_USER") or 'root',
-    'port': os.getenv("SQL_PORT") or 3306,
-    'password': os.getenv("SQL_PASSWORD") or '',
-    'database': os.getenv("SQL_DATABASE") or 'harvest'
-}
-
-# Create a connection pool
-connection_pool = pooling.MySQLConnectionPool(pool_name="mypool",
-                                              pool_size=2,
-                                              **cnf)
-
-ImageProperties = namedtuple(
-    'ImageProperties', ['name', 'hex_color', 'tags', 'make', 'orientation', 'width', 'height']
-)
-
-
-def get_metadata_from_mariadb_as_imageproperties():
-    # Open a connection to the database
-    conn = connection_pool.get_connection()
-    # Create a cursor
-    c = conn.cursor()
-
-    # Retrieve the metadata
-    c.execute("""
-        SELECT DISTINCT filename, GROUP_CONCAT(CONCAT(mkey, '\t', mvalue) SEPARATOR '\n') AS metadata
-        FROM metadata
-        WHERE mkey IN ('Make', 'Orientation', 'ImageWidth', 'ImageHeight', 'tags', 'dominant_color')
-        GROUP BY filename;
-    """)
-    metadata = c.fetchall()
-
-    # Close the connection
-    conn.close()
-
-    # use the namedtuple ImageProperties to store the metadata
-    images = []
-
-    # Loop through the rows of metadata
-    for row in metadata:
-        try:
-            filename, metadata_str = row
-            metadata_items = metadata_str.split('\n')
-            metadata_dict = {key: value for key, value in (item.split('\t') for item in metadata_items)}
-
-            # Clean dominant colors: convert the string to a list of tuples and extract only the color hex codes
-            dominant_colors = ast.literal_eval(metadata_dict.get('dominant_color', '[]'))
-            hex_colors = [color[0] for color in dominant_colors]
-
-            # Clean tags: convert the string to a list of strings
-            tags = ast.literal_eval(metadata_dict.get('tags', '[]'))
-
-            # Create an ImageProperties object for each row
-            image = ImageProperties(
-                name=filename,
-                hex_color=hex_colors,
-                tags=tags,
-                make=metadata_dict.get('Make', None),
-                orientation=metadata_dict.get('Orientation', None),
-                width=metadata_dict.get('ImageWidth', None),
-                height=metadata_dict.get('ImageHeight', None)
-            )
-
-            # Add the ImageProperties object to the list
-            images.append(image)
-        except:
-            pass
-
-    return images
-
-
-def clean(data):
-    """
-    :param data: DataFrame
-    :return:
-    """
-    # 1. first, get only the first hex_color
-    # 2. Convert each column to the right type of data
-    # 2. Remove rows with missing values
-
-    data['hex_color'] = data['hex_color'].apply(lambda x: x[0] if len(x) > 0 else None)
-    data['width'] = pd.to_numeric(data['width'], errors='coerce')
-    data['height'] = pd.to_numeric(data['height'], errors='coerce')
-    data['orientation'] = pd.to_numeric(data['orientation'], errors='coerce')
-
-    data = data.dropna()
-
-    return data
-
-
-def preprocess(data):
-    # 1. Normalize and scale numerical properties
-    # Width and Height: scale to [0, 1] by dividing each value by the maximum value
-    # Hex colors: Convert hex colors to RGB values in the range 0-255 and normalize it by dividing by 255 (range [0, 1])
-
-    data['width'] = data['width'] / data['width'].max()
-    data['height'] = data['height'] / data['height'].max()
-
-    # Convert hex color to RGB and normalize
-    # Remove # from hex color
-    data["hex_color"] = data["hex_color"].apply(lambda x: x[1:])
-    data["rgb_color"] = data["hex_color"].apply(lambda x: tuple(int(x[i:i + 2], 16) for i in (0, 2, 4)))
-    data[["r", "g", "b"]] = pd.DataFrame(data["rgb_color"].tolist(), index=data.index) / 255
-    data.drop(["hex_color", "rgb_color"], axis=1, inplace=True)
-
-    # One-hot encode categorical properties
-    # 1. tags, make, orientation
-    data = pd.concat([data, pd.get_dummies(data["tags"].apply(pd.Series).stack()).sum(level=0)], axis=1)
-    data = pd.concat([data, pd.get_dummies(data["make"], prefix="make")], axis=1)
-    data["landscape"] = data["orientation"].apply(lambda x: 1 if x == 0 else 0)
-    data["portrait"] = data["orientation"].apply(lambda x: 1 if x == 1 else 0)
-    data.drop(["tags", "make", "orientation"], axis=1, inplace=True)
-
-    return data
-
-
-from sklearn.model_selection import train_test_split
-import gym
-import numpy as np
-from gym import spaces
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from stable_baselines3 import DQN
-from stable_baselines3.dqn import MlpPolicy
-from stable_baselines3.common.vec_env import DummyVecEnv
-from sklearn.metrics.pairwise import cosine_similarity
-
-@app.route('/recommend', methods=['GET'])
-def recommend():
-    raw_image_properties = get_metadata_from_mariadb_as_imageproperties()
-    # Save raw image properties to a file named raw_image_properties.csv in the shared folder
-    pd.DataFrame(raw_image_properties).to_csv('./shared/raw_image_properties.csv', index=False, sep="|")
-
-    # read csv file
-    df = pd.read_csv('./shared/raw_image_properties.csv', sep="|")
-
-    # Convert the list of ImageProperties objects to a pandas DataFrame
-    df = pd.DataFrame(raw_image_properties)
-
-    clean_image_properties = clean(df)
-    processed_image_properties = preprocess(clean_image_properties)
-
-    # Create feature vectors (numpy array)
-    feature_vectors = processed_image_properties.drop(["name"], axis=1).values
-
-    # Combine the feature vectors with the image names in a new DataFrame
-    data_with_features = processed_image_properties[['name']].copy()
-    data_with_features['features'] = list(feature_vectors)
-
-    # Split the dataset into training (70%) and the remaining 30%
-    train_data, temp_data = train_test_split(data_with_features, test_size=0.3, random_state=42)
-
-    # Split the remaining data into validation (15%) and test (15%) sets
-    validation_data, test_data = train_test_split(temp_data, test_size=0.5, random_state=42)
-
-    env = ImageRecommenderEnvironment(data_with_features)
-    env = DummyVecEnv([lambda: ImageRecommenderEnvironment(data_with_features)])
-
-    input_dim = env.observation_space.shape[0]
-    output_dim = env.action_space.n
-
-    policy_kwargs = dict(
-        features_extractor_class=CustomDQNNetwork,
-        features_extractor_kwargs=dict(input_dim=input_dim, output_dim=output_dim)
-    )
-
-    agent = DQN(MlpPolicy, env, policy_kwargs=policy_kwargs, verbose=1)
-
-    total_timesteps = 50000  # Adjust this value based on the problem and computational resources
-    agent.learn(total_timesteps=total_timesteps)
-
-    # Save the trained agent
-    #agent.save("dqn_agent.pkl")
-
-    # Load the trained agent
-    #agent = DQN.load("dqn_agent.pkl")
-
-    # Create validation and test environments
-    validation_env = DummyVecEnv([lambda: ImageRecommenderEnvironment(validation_data)])
-    test_env = DummyVecEnv([lambda: ImageRecommenderEnvironment(test_data)])
-
-    # Evaluate the agent on the validation and test sets
-    num_validation_episodes = 100
-    num_test_episodes = 100
-
-    validation_reward = evaluate_agent(agent, validation_env, num_validation_episodes)
-    test_reward = evaluate_agent(agent, test_env, num_test_episodes)
-
-    print(f"Validation reward: {validation_reward}")
-    print(f"Test reward: {test_reward}")
-
-    # Precision = TP / (TP + FP)
-    # Recall = TP / (TP + FN)
-    # F1-score = 2 * (Precision * Recall) / (Precision + Recall)
-
-
-    return jsonify(
-        {
-            'status': 'success',
-            'message': 'Recommendation successful',
-            'data': {
-                'validation_reward': validation_reward,
-                'test_reward': test_reward,
-                "precision": "NaN",
-                "recall": "NaN",
-                "f1_score": "NaN"
-            }
-        }
-    )
-
-
-class ImageRecommenderEnvironment(gym.Env):
-    def __init__(self, data_with_features):
-        super(ImageRecommenderEnvironment, self).__init__()
-
-        self.data = data_with_features
-        self.current_state = None
-
-        # Define action space as the indices of the images
-        self.action_space = spaces.Discrete(len(self.data))
-
-        # Define state space as the feature vectors
-        feature_vector_length = len(self.data['features'].iloc[0])
-        self.observation_space = spaces.Box(low=0, high=1, shape=(feature_vector_length,), dtype=np.float32)
-
-    def reset(self):
-        # Reset the environment to an initial state
-        self.current_state = self._get_initial_state()
-        return self.current_state
-
-    def step(self, action):
-        # Execute the given action and observe the next state and reward
-        next_state, reward = self._get_next_state_and_reward(action)
-
-        # Check if the episode is done
-        done = self._is_done(next_state)
-
-        # Update the current state
-        self.current_state = next_state
-
-        return next_state, reward, done, {}
-
-    def render(self, mode='human'):
-        # Render the current state of the environment (optional)
-        pass
-
-    def _get_initial_state(self):
-        # Implement a method to generate an initial state
-        pass
-
-    def _get_next_state_and_reward(self, action):
-        # Implement a method to get the next state and reward based on the action taken
-        pass
-
-    def _is_done(self, next_state):
-        # Implement a method to check if the episode is done
-        pass
-
-
-class CustomDQNNetwork(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(CustomDQNNetwork, self).__init__()
-
-        self.network = nn.Sequential(
-            nn.Linear(input_dim, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, output_dim)
+logging.basicConfig(level=logging.DEBUG, format='%(levelname)s - %(message)s')
+
+labels = ['N/A', 'person', 'traffic light', 'fire hydrant', 'street sign', 'stop sign', 'parking meter', 'bench',
+          'bird', 'cat', 'dog', 'horse', 'bicycle', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'hat',
+          'backpack', 'umbrella', 'shoe', 'car', 'eye glasses', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis',
+          'snowboard', 'sports ball', 'kite', 'baseball bat', 'motorcycle', 'baseball glove', 'skateboard', 'surfboard',
+          'tennis racket', 'bottle', 'plate', 'wine glass', 'cup', 'fork', 'knife', 'airplane', 'spoon', 'bowl',
+          'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'bus', 'donut', 'cake',
+          'chair', 'couch', 'potted plant', 'bed', 'mirror', 'dining table', 'window', 'desk', 'train', 'toilet',
+          'door', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'truck', 'toaster',
+          'sink', 'refrigerator', 'blender', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'boat',
+          'toothbrush']
+
+tokenizer = PreTrainedTokenizerFast.from_pretrained("bert-base-uncased")
+tokenizer.add_tokens(labels)
+
+
+def release_collection(collection_name):
+    if utility.has_collection(collection_name):
+        collection = Collection(name=collection_name)
+        collection.release()
+        logging.info("Collection released")
+
+
+def connect_to_milvus():
+    connections.connect(host="standalone", port="19530")
+
+    collection_name = "metadata_vectors"
+    if not utility.has_collection(collection_name):
+        schema = CollectionSchema(
+            fields=[
+                FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
+                FieldSchema(name="filename", dtype=DataType.VARCHAR, max_length_per_row=200, max_length=200),
+                FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=21),
+            ],
+            description="Collection for metadata vectors",
         )
+        Collection(name=collection_name, schema=schema)
 
-    def forward(self, x):
-        return self.network(x)
+    # release the collection if is load in memory
+    release_collection(collection_name)
+
+    logging.info("Connected to Milvus")
+    return collection_name
 
 
-def reward_function(user_preferences, recommended_image_features):
-    similarities = cosine_similarity(user_preferences, recommended_image_features)
-    return similarities.mean()
+def custom_padding(tokens, max_tags):
+    if len(tokens) < max_tags:
+        padding = [0] * (max_tags - len(tokens))
+        tokens.extend(padding)
+    else:
+        tokens = tokens[:max_tags]
+    return tokens
 
-def evaluate_agent(agent, env, num_episodes):
-    total_rewards = []
 
-    for episode in range(num_episodes):
-        state = env.reset()
-        done = False
-        episode_reward = 0
+def normalize_scale(value, scale):
+    return value / scale
 
-        while not done:
-            action, _ = agent.predict(state, deterministic=True)
-            next_state, reward, done, _ = env.step(action)
-            episode_reward += reward
-            state = next_state
 
-        total_rewards.append(episode_reward)
+def encode_make(make):
+    return int.from_bytes(make.encode(), 'little') % 10 ** 10
 
-    return np.mean(total_rewards)
+
+def extract_rgb(dominant_colors):
+    return [color / 255 for sublist in dominant_colors for color in sublist]
+
+
+def tokenize_tags(tokenizer, tags, max_tags):
+    if not tags:
+        tags = ['N/A'] * max_tags
+    tokens = tokenizer.convert_tokens_to_ids(tags)
+    tokens = custom_padding(tokens, max_tags)
+
+    # replace None by 0
+    tokens = [0 if x is None else x for x in tokens]
+
+    return tokens
+
+
+def hex_to_rgb(hex):
+    h = hex.lstrip('#')
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def vectorize_preferences(preferences):
+    width = normalize_scale(preferences['imagewidth'], 1000000)
+    height = normalize_scale(preferences['imageheight'], 1000000)
+    orientation = float(1) if preferences['orientation'] == 'landscape' else float(0)
+    make = encode_make(preferences['make'])
+
+    rgb_color = hex_to_rgb(preferences['dominant_color'])
+
+    logging.info("RGB: {}".format(rgb_color))
+
+    r, g, b = rgb_color
+    r = normalize_scale(r, 255)
+    g = normalize_scale(g, 255)
+    b = normalize_scale(b, 255)
+
+    tags = preferences['tags']
+    # Remove duplicates
+    tags = list(dict.fromkeys(tags))
+    logging.info("Tags: {}".format(tags))
+
+    # Use OneHotEncoder to encode the tags (but use only the first 5)
+    max_tags = 5
+    labels_array = np.array(labels).reshape(-1, 1)
+    encoder = OneHotEncoder(sparse=False)
+    encoder.fit(labels_array)
+    tags_array = np.array(tags).reshape(-1, 1)
+    result = encoder.transform(tags_array)
+    logging.info("Tags: {}".format(result))
+    # convert to array of float
+    tokenized_tags = result.toarray().tolist()[0]
+    logging.info("Tags: {}".format(tokenized_tags))
+    tokenized_tags = custom_padding(tokenized_tags, max_tags)
+
+    logging.info("Width: {}".format(width))
+    logging.info("Height: {}".format(height))
+    logging.info("Orientation: {}".format(orientation))
+    logging.info("Make: {}".format(make))
+    logging.info("R: {}".format(r))
+    logging.info("G: {}".format(g))
+    logging.info("B: {}".format(b))
+    logging.info("Tags: {}".format(tokenized_tags))
+
+    vector = [width, height, orientation, make, r, g, b, r, g, b, r, g, b, r, g, b] + tokenized_tags
+
+    return vector
+
+
+@app.route('/recommend', methods=['POST'])
+def recommend():
+    try:
+        # Get the preferences from the request
+        data = request.get_json()
+        # {'dominant_color': '#000000', 'imagewidth': 800, 'imageheight': 600, 'orientation': 'landscape', 'tags': ['nature', 'landscape'], 'make': 'Canon'}
+
+        preferences = data["preferences"]
+
+        # Convert the preferences to a vector
+        vector = vectorize_preferences(preferences)
+
+        logging.info("Vector: {}".format(vector))
+
+        # Connect to Milvus
+        collection_name = connect_to_milvus()
+
+        # Load the metadata vectors
+        collection = Collection(name=collection_name)
+        collection.load()
+
+        # Get the top 10 recommendations
+        query_vector = [vector]
+        search_param = {
+            "data": query_vector,
+            "anns_field": "vector",
+            "param": {"metric_type": "L2", "params": {"nprobe": 1024}},
+            "limit": 10,
+        }
+
+        results = collection.search(**search_param)
+
+        logging.info("Results: {} : {}".format(type(results), results))
+
+        # Get the primary keys (IDs) of the top 10 nearest neighbors
+        top_ids = [result.id for result in results[0]]
+
+        logging.info("Top IDs: {} : {}".format(type(top_ids), top_ids))
+
+        # Fetch filenames corresponding to the primary keys (IDs) using query()
+        id_list_str = ", ".join(map(str, top_ids))
+        expr = f"id in [{id_list_str}]"
+        output_fields = ["id", "filename"]
+        query_results = collection.query(expr, output_fields=output_fields)
+
+        logging.info("Query Results: {} : {}".format(type(query_results), query_results))
+
+        # Create a mapping of primary keys (IDs) to filenames
+        id_to_filename = {result["id"]: result["filename"] for result in query_results}
+
+        logging.info("ID to Filename: {} : {}".format(type(id_to_filename), id_to_filename))
+
+        # release
+        collection.release()
+
+    except:
+        # Log details of the exception and request data
+        logging.error("Request : {} {}".format(request.data, request.args))
+        logging.error(request.values)
+        logging.error("Unexpected error: {}".format(sys.exc_info()[0]))
+        return jsonify({"error": "Unexpected error: {}".format(sys.exc_info()[0])})
+
+    return jsonify(id_to_filename)
 
 
 if __name__ == '__main__':
