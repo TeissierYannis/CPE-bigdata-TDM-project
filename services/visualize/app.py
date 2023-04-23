@@ -814,8 +814,8 @@ def display_coordinates_on_map():
     return send_file('map.html', mimetype='text/html')
 
 
-@app.route('/graph/graph/countries', methods=['GET'])
-@app.route('/graph/graph/countries/<int:nb_inter>/<graph>', methods=['GET'])
+@app.route('/graph/countries', methods=['GET'])
+@app.route('/graph/countries/<int:nb_inter>/<graph>', methods=['GET'])
 def graph_images_countries(nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by country
@@ -860,8 +860,8 @@ def graph_images_countries(nb_inter=5, graph='all'):
         return Response(combined_buffer.getvalue(), mimetype='image/png')
 
 
-@app.route('/graph/graph/altitude', methods=['GET'])
-@app.route('/graph/graph/altitude/<int:nb_inter>/<graph>', methods=['GET'])
+@app.route('/graph/altitude', methods=['GET'])
+@app.route('/graph/altitude/<int:nb_inter>/<graph>', methods=['GET'])
 def graph_images_altitudes(nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by altitude.

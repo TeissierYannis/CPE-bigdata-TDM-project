@@ -93,7 +93,9 @@ The visualise service is available through many endpoints :
 - **images size static**:
 ```bash
 curl http://127.0.0.1:81/visualize/graph/size/static
+```
 or 
+```bash
 curl http://127.0.0.1:81/visualize/graph/size/static/<interval_size>/<nb_intervals>
 ```
 This will return a graph of the number of images per size interval.
@@ -101,9 +103,13 @@ This will return a graph of the number of images per size interval.
 - **images size dynamic**:
 ```bash
 curl http://127.0.0.1:81/graph/size
+```
 or
+```bash
 curl http://127.0.0.1:81/graph/size/dynamic
+```
 or
+```bash
 curl http://127.0.0.1:81/graph/size/dynamic/<nb_intervals>/<graph_type>
 ```
 This will return a graph of the number of images per size interval.
@@ -113,7 +119,9 @@ You can choose the number of intervals and the type of graph (bar, pie or all)
 - **images year**:
 ```bash
 curl http://127.0.0.1:81/graph/year
+```
 or 
+```bash
 curl http://127.0.0.1:81/graph/year/<nb_intervals>/<graph_type>
 ```
 This will return a graph of the number of images per year.
@@ -122,7 +130,9 @@ You can choose the number of intervals and the type of graph (bar, pie, curve or
 - **Camera brand**:
 ```bash
 curl http://127.0.0.1:81/graph/brand
+```
 or 
+```bash
 curl http://127.0.0.1:81/graph/brand/<nb_columns>/<graph_type>
 ```
 This will return a graph of the number of images per camera brand.
@@ -138,7 +148,9 @@ The simplest way to see the map is to use this request in a browser.
 - **images countries**:
 ```bash
 curl http://127.0.0.1:81/graph/countries
+```
 or
+```bash
 curl http://127.0.0.1:81/graph/countries/<nb_countries>/<graph_type>
 ```
 This will return a graph of the number of images per country.
@@ -148,7 +160,9 @@ You can choose the number of countries and the type of graph (bar, pie or all)
 - **images altitude**:
 ```bash
 curl http://127.0.0.1:81/graph/altitude
+```
 or
+```bash
 curl http://127.0.0.1:81/graph/altitude/<nb_intervals>/<graph_type>
 ```
 This will return a graph of the number of images per altitude interval.
@@ -157,7 +171,9 @@ You can choose the number of intervals and the type of graph (histogram, pie or 
 - **images dominant color**:
 ```bash
 curl http://127.0.0.1:81/graph/dominant_color
+```
 or
+```bash
 curl http://127.0.0.1:81/graph/dominant_color/<nb_colors>/<graph_type>
 ```
 This will return a graph of the dominant color of the images.
@@ -166,7 +182,9 @@ You can choose the number of colors and the type of graph (bar, treemap or all)
 - **images tags**:
 ```bash
 curl http://127.0.0.1:81/graph/tags/top
+```
 or
+```bash
 curl http://127.0.0.1:81/graph/tags/top/<nb_tags>/<graph_type>
 ```
 This will return a graph of the most common object in the images.
