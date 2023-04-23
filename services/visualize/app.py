@@ -1,6 +1,6 @@
 import os
 import io
-import time
+
 import spacy
 import folium
 import datetime
@@ -9,7 +9,6 @@ import webcolors
 import collections
 import numpy as np
 import pandas as pd
-import mysql.connector
 import matplotlib.pyplot as plt
 
 from tqdm import tqdm
@@ -17,7 +16,9 @@ from PIL import Image
 from dotenv import load_dotenv
 from collections import Counter
 from geopy.geocoders import Nominatim
+from sqlalchemy.orm import sessionmaker
 from scipy.spatial.distance import pdist
+from sqlalchemy import create_engine, text
 from flask import Flask, Response, request, send_file
 from scipy.cluster.hierarchy import dendrogram, linkage
 
@@ -25,21 +26,10 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Set the base folder path for the project
-output_path = "../output"
-# Path to save metadata
-metadata_path = './metadata'
 
-# Set SQL variables
-sql_host = os.getenv("SQL_HOST")
-sql_user = os.getenv("SQL_USER")
-sql_password = os.getenv("SQL_PASSWORD")
-sql_database = os.getenv("SQL_DATABASE")
-
-
-def get_metadata_from_mariadb_db(db_name='bigdata', user='root', password='', host='localhost', port='3306'):
+def get_metadata_from_postgres_db():
     """
-    Get the metadata from the MariaDB database
+    Get the metadata from the PostgreSQL database
 
     :param db_name: The name of the database
     :param user: The username to connect to the database
@@ -50,44 +40,54 @@ def get_metadata_from_mariadb_db(db_name='bigdata', user='root', password='', ho
     """
     print("Connecting to database...")
 
-    # Open a connection to the database
-    conn = mysql.connector.connect(
-        user=user,
-        password=password,
-        host=host,
-        port=port,
-        database=db_name
-    )
-    # Create a cursor
-    c = conn.cursor()
+    # Create the database engine
+    engine = create_engine("postgresql://postgres:postgres@postgres:5432/raw_metadata")
+
+    # Create a session
+    Session = sessionmaker(bind=engine)
+    session = Session()
 
     print("Retrieving metadata from database...")
 
     # Retrieve the metadata
-    c.execute("""
-        SELECT filename, GROUP_CONCAT(CONCAT(mkey, '\t', mvalue) SEPARATOR '\n') AS metadata
-        FROM metadata
-        GROUP BY filename;
-    """)
-    metadata = c.fetchall()
+    result = session.execute(
+        text("""SELECT filename, Make, Model, Software, BitsPerSample, ImageWidth, ImageHeight, ImageDescription,
+    Orientation, Copyright, DateTime, DateTimeOriginal, DateTimeDigitized, SubSecTimeOriginal,
+    ExposureTime, FNumber, ExposureProgram, ISOSpeedRatings, SubjectDistance, ExposureBiasValue,
+    Flash, FlashReturnedLight, FlashMode, MeteringMode, FocalLength, FocalLengthIn35mm,
+    Latitude, LatitudeDegrees, LatitudeMinutes, LatitudeSeconds, LatitudeDirection,
+    Longitude, LongitudeDegrees, LongitudeMinutes, LongitudeSeconds, LongitudeDirection,
+    Altitude, DOP, FocalLengthMin, FocalLengthMax, FStopMin, FStopMax, LensMake, LensModel,
+    FocalPlaneXResolution, FocalPlaneYResolution, tags, dominant_color
+    FROM image_metadata;""")
+    )
 
-    # Close the connection
-    conn.close()
+    keys = [
+        'filename', 'Make', 'Model', 'Software', 'BitsPerSample', 'ImageWidth', 'ImageHeight', 'ImageDescription',
+        'Orientation', 'Copyright', 'DateTime', 'DateTimeOriginal', 'DateTimeDigitized', 'SubSecTimeOriginal',
+        'ExposureTime', 'FNumber', 'ExposureProgram', 'ISOSpeedRatings', 'SubjectDistance', 'ExposureBiasValue',
+        'Flash', 'FlashReturnedLight', 'FlashMode', 'MeteringMode', 'FocalLength', 'FocalLengthIn35mm',
+        'Latitude', 'LatitudeDegrees', 'LatitudeMinutes', 'LatitudeSeconds', 'LatitudeDirection',
+        'Longitude', 'LongitudeDegrees', 'LongitudeMinutes', 'LongitudeSeconds', 'LongitudeDirection',
+        'Altitude', 'DOP', 'FocalLengthMin', 'FocalLengthMax', 'FStopMin', 'FStopMax', 'LensMake', 'LensModel',
+        'FocalPlaneXResolution', 'FocalPlaneYResolution', 'tags', 'dominant_color'
+    ]
 
     # Convert the metadata to a dictionary
-    result = {}
-    for image in tqdm(metadata, desc="Get metadata from database"):
+    metadata_dict = {}
+    for row in tqdm(result, desc="Get metadata from database"):
         try:
-            result[image[0]] = {}
-            props = image[1].split('\n')
-            for prop in props:
-                if prop:
-                    k, value = prop.split('\t')
-                    result[image[0]][k] = value
+            # use row to find
+            metadata_dict[row[0]] = {}
+            for i in range(len(keys)):
+                metadata_dict[row[0]][keys[i]] = row[i]
         except Exception as e:
-            print(e, image)
+            print(e, row)
 
-    return result
+    # Close the session
+    session.close()
+
+    return metadata_dict
 
 
 def dms_to_decimal(degrees, minutes, seconds):
@@ -123,7 +123,10 @@ def clean_gps_infos(metadata_to_cln):
             has_decimal_values = file_meta['Latitude'] != '0.000000' or file_meta['Longitude'] != '0.000000'
 
             if has_dms_values or has_decimal_values:
-                should_convert = '.' not in file_meta['Latitude'] and has_dms_values
+                try:
+                    should_convert = '.' not in file_meta['Latitude'] and has_dms_values
+                except:
+                    continue
 
                 if should_convert:
                     # calculate the decimal coordinates from the degrees coordinates
@@ -238,7 +241,8 @@ def get_metadata():
         return pd.read_csv('metadata.csv')
     else:
         # Get the metadata from the database
-        brut_metadata = get_metadata_from_mariadb_db(sql_database, sql_user, sql_password, sql_host)
+        # brut_metadata = get_metadata_from_mariadb_db(sql_database, sql_user, sql_password, sql_host)
+        brut_metadata = get_metadata_from_postgres_db()
         # Clean the metadata
         cln_metadata = clean_metadata(brut_metadata)
         # Convert the metadata to a DataFrame
@@ -981,10 +985,13 @@ def graph_dominant_colors(nb_inter=20, graph='all'):
     if graph == 'bar':
         buffer = display_bar(title=title, x_label=x_label, y_label=y_label, colors=top_colors.keys(),
                              x_values=top_colors.keys(), y_values=top_colors.values())
+        return Response(buffer.getvalue(), mimetype='image/png')
     elif graph == 'pie':
         buffer = display_pie(title=title, values=top_colors.values(), labels=top_colors.keys(), colors=color_labels)
+        return Response(buffer.getvalue(), mimetype='image/png')
     elif graph == 'treemap':
         buffer = display_tree_map(title=title, sizes=sizes, labels=color_labels, colors=color, alpha=.7)
+        return Response(buffer.getvalue(), mimetype='image/png')
     else:
         buffer_bar = display_bar(title=title, x_label=x_label, y_label=y_label, colors=top_colors.keys(),
                                  x_values=top_colors.keys(), y_values=top_colors.values())
@@ -1010,6 +1017,7 @@ def graph_top_tags(nb_inter=5, graph='all'):
 
     # Check the parameters
     graph = graph_type_check(graph)
+
     nb_inter = interval_check_to_int(nb_inter)
 
     all_tags = []
@@ -1024,15 +1032,20 @@ def graph_top_tags(nb_inter=5, graph='all'):
     y_label = 'Count'
 
     if graph == 'bar':
-        return display_bar(title=title, x_label=x_label, y_label=y_label,
-                           x_values=top_tags.keys(), y_values=top_tags.values())
+        buffer = display_bar(title=title, x_label=x_label, y_label=y_label,
+                             x_values=top_tags.keys(), y_values=top_tags.values())
+        return Response(buffer.getvalue(), mimetype='image/png')
     elif graph == 'pie':
-        return display_pie(title=title, values=top_tags.values(), labels=top_tags.keys())
+        buffer = display_pie(title=title, values=top_tags.values(), labels=top_tags.keys())
+        return Response(buffer.getvalue(), mimetype='image/png')
     else:
-        bar = display_bar(title=title, x_label=x_label, y_label=y_label,
-                          x_values=top_tags.keys(), y_values=top_tags.values())
-        pie = display_pie(title=title, values=top_tags.values(), labels=top_tags.keys())
-        return bar, pie
+        buffer_bar = display_bar(title=title, x_label=x_label, y_label=y_label,
+                                 x_values=top_tags.keys(), y_values=top_tags.values())
+        buffer_pie = display_pie(title=title, values=top_tags.values(), labels=top_tags.keys())
+
+        # combine the 2 graphs
+        combined_buffer = merge_buffers_to_img(buffer_bar, buffer_pie)
+        return Response(combined_buffer.getvalue(), mimetype='image/png')
 
 
 def categorize_tags(df_meta, categories_list: list):
@@ -1043,7 +1056,7 @@ def categorize_tags(df_meta, categories_list: list):
     :param df_meta: DataFrame of metadata
     :return: dictionary of categories
     """
-    # Concatène toutes les listes de tags
+    # Concatenate all tags in a list
     all_tags = []
     for tags in df_meta['tags']:
         try:
@@ -1054,7 +1067,7 @@ def categorize_tags(df_meta, categories_list: list):
             print("Error : ", tags)
 
     # Load pre-trained word embedding model
-    nlp = spacy.load("en_core_web_lg")
+    nlp = spacy.load("en_core_web_md")
 
     categories = {}
     for cate in categories_list:
@@ -1085,16 +1098,21 @@ def graph_categorized_tags():
     # get the metadata
     df_meta = get_metadata()
 
-    # list of categories
-    categories_list = request.get_json().get('list')
+    # Check if the request body contains JSON data
+    if request.is_json:
+        # Get the list of categories from the request
+        categories_list = request.get_json().get('list')
+    else:
+        categories_list = None
 
-    if categories_list is None or categories_list == '':
+    # Verify if the categories_list is a list and not empty
+    if categories_list is None or not isinstance(categories_list, list) or len(categories_list) == 0:
         print("No list of categories provided, using default list")
-    # default list of categories
-    categories_list = [
-        'Fruit', 'Animal', 'Electronics', 'Furniture', 'Vehicle',
-        'Clothing', 'Sport', 'Kitchen', 'Outdoor', 'Accessory'
-    ]
+        # default list of categories
+        categories_list = [
+            'Fruit', 'Animal', 'Electronics', 'Furniture', 'Vehicle',
+            'Clothing', 'Sport', 'Kitchen', 'Outdoor', 'Accessory'
+        ]
 
     categorized_tags = categorize_tags(df_meta, categories_list)
 
