@@ -6,7 +6,6 @@ import folium
 import datetime
 import squarify
 import webcolors
-import collections
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -788,7 +787,7 @@ def get_country(coordinates):
     return coordinates
 
 
-@app.route('/graph/gps/map', methods=['GET'])
+@app.route('/graph/map', methods=['GET'])
 def display_coordinates_on_map():
     """
     Display the coordinates on a map
@@ -815,13 +814,13 @@ def display_coordinates_on_map():
     return send_file('map.html', mimetype='text/html')
 
 
-@app.route('/graph/gps/continent', methods=['GET'])
-@app.route('/graph/gps/continent/<int:nb_inter>/<graph>', methods=['GET'])
+@app.route('/graph/graph/countries', methods=['GET'])
+@app.route('/graph/graph/countries/<int:nb_inter>/<graph>', methods=['GET'])
 def graph_images_countries(nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by country
 
-    :param nb_inter: number of interval
+    :param nb_inter: number of countries to display
     :param graph: type of graph to display (bar, pie, all)
     """
     df_meta = get_metadata()
@@ -861,7 +860,8 @@ def graph_images_countries(nb_inter=5, graph='all'):
         return Response(combined_buffer.getvalue(), mimetype='image/png')
 
 
-@app.route('/graph/gps/altitude', methods=['GET'])
+@app.route('/graph/graph/altitude', methods=['GET'])
+@app.route('/graph/graph/altitude/<int:nb_inter>/<graph>', methods=['GET'])
 def graph_images_altitudes(nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by altitude.
@@ -963,7 +963,7 @@ def graph_dominant_colors(nb_inter=20, graph='all'):
     """
     Display graphs about the number of images by dominant color
 
-    :param nb_inter: number of interval
+    :param nb_inter: number of colors
     :param graph: type of graph to display (bar, pie, treemap, all)
     """
     # Get the metadata
@@ -1055,8 +1055,8 @@ def graph_top_tags(nb_inter=5, graph='all'):
     """
     Display graphs about the number of images by tags
 
-    :param nb_inter: number of interval
-    :param graph: type of graph to display (bar, pie, treemap, all)
+    :param nb_inter: number of tags
+    :param graph: type of graph to display (bar, pie, all)
     """
     # get the metadata
     df_meta = get_metadata()
