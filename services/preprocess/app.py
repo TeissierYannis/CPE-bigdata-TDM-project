@@ -2,11 +2,11 @@ import json
 import pandas as pd
 from dotenv import load_dotenv
 import psycopg2.extensions
-from pymilvus import DataType, Collection, CollectionSchema, FieldSchema, connections, utility, IndexType
+from pymilvus import DataType, Collection, CollectionSchema, FieldSchema, connections, utility
 import ast
 import numpy as np
 import logging
-from transformers import PreTrainedTokenizerFast
+import spacy
 
 load_dotenv()
 
@@ -20,29 +20,6 @@ conn = psycopg2.connect(
     user="postgres",
     password="postgres"
 )
-
-labels = ['N/A', 'person', 'traffic light', 'fire hydrant', 'street sign', 'stop sign', 'parking meter', 'bench',
-          'bird', 'cat', 'dog', 'horse', 'bicycle', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'hat',
-          'backpack', 'umbrella', 'shoe', 'car', 'eye glasses', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis',
-          'snowboard', 'sports ball', 'kite', 'baseball bat', 'motorcycle', 'baseball glove', 'skateboard', 'surfboard',
-          'tennis racket', 'bottle', 'plate', 'wine glass', 'cup', 'fork', 'knife', 'airplane', 'spoon', 'bowl',
-          'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'bus', 'donut', 'cake',
-          'chair', 'couch', 'potted plant', 'bed', 'mirror', 'dining table', 'window', 'desk', 'train', 'toilet',
-          'door', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'truck', 'toaster',
-          'sink', 'refrigerator', 'blender', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'boat',
-          'toothbrush']
-
-tokenizer = PreTrainedTokenizerFast.from_pretrained("bert-base-uncased")
-tokenizer.add_tokens(labels)
-
-
-def custom_padding(tokens, max_tags):
-    if len(tokens) < max_tags:
-        padding = [0] * (max_tags - len(tokens))
-        tokens.extend(padding)
-    else:
-        tokens = tokens[:max_tags]
-    return tokens
 
 
 def release_collection(collection_name):
@@ -61,7 +38,7 @@ def connect_to_milvus():
             fields=[
                 FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
                 FieldSchema(name="filename", dtype=DataType.VARCHAR, max_length_per_row=200, max_length=200),
-                FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=21),
+                FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=1516),
             ],
             description="Collection for metadata vectors",
         )
@@ -127,19 +104,21 @@ def extract_rgb(dominant_colors):
     return [color / 255 for sublist in dominant_colors for color in sublist]
 
 
-def tokenize_tags(tokenizer, tags, max_tags):
-    if not tags:
-        tags = ['N/A'] * max_tags
-    tokens = tokenizer.convert_tokens_to_ids(tags)
-    tokens = custom_padding(tokens, max_tags)
+def words_to_embeddings(words):
+    words = [word.replace(' ', '') for word in words]
+    nlp = spacy.load("en_core_web_md")
+    # Generate embeddings for each word
+    embeddings = []
+    for word in words:
+        try:
+            m = nlp(word).vector
+            embeddings.append(m)
+        except KeyError:
+            embeddings.append(np.zeros(300))
+    return embeddings
 
-    # replace None by 0
-    tokens = [0 if x is None else x for x in tokens]
 
-    return tokens
-
-
-def preprocess_with_tags(data, tokenizer, max_tags=5):
+def preprocess_with_tags(data, max_tags=5):
     width = normalize_scale(data, 'imagewidth', 1000000)
     height = normalize_scale(data, 'imageheight', 1000000)
     orientation = float(data['orientation'].values[0])
@@ -153,8 +132,17 @@ def preprocess_with_tags(data, tokenizer, max_tags=5):
     rgb_values = extract_rgb(dominant_colors)
 
     tags = eval(data['tags'].values[0])
-    tokenized_tags = tokenize_tags(tokenizer, tags, max_tags)
-    vector = [width, height, orientation, make] + rgb_values + tokenized_tags
+
+    # If the tags list is not equal to 5, fill it with 'N/A' tags
+    for i in range(max_tags):
+        if len(tags) < max_tags:
+            tags.append('N/A')
+
+    embedding = words_to_embeddings(tags)
+    # Embedding is a list of list, we want to flatten it
+    embedding = [item for sublist in embedding for item in sublist]
+
+    vector = [width, height, orientation, make] + rgb_values + embedding
 
     return vector
 
@@ -162,7 +150,7 @@ def preprocess_with_tags(data, tokenizer, max_tags=5):
 def process_new_metadata(new_metadata):
     # Clean and preprocess new metadata to convert it to a vector
     cleaned_metadata = clean(new_metadata)
-    vector = preprocess_with_tags(cleaned_metadata, tokenizer, max_tags=5)
+    vector = preprocess_with_tags(cleaned_metadata, max_tags=5)
     filename = new_metadata["filename"]
     collection_name = connect_to_milvus()
     collection = Collection(name=collection_name)
@@ -182,6 +170,9 @@ def process_new_metadata(new_metadata):
     logging.info("New metadata processed")
 
 
+logging.info("Listening for new metadata")
+# Poll for new notifications and process new metadata
+
 # Set connection to asynchronous mode
 conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
 
@@ -189,8 +180,6 @@ conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
 cur = conn.cursor()
 cur.execute("LISTEN metadata_channel;")
 
-logging.info("Listening for new metadata")
-# Poll for new notifications and process new metadata
 while True:
     conn.poll()
     while conn.notifies:
@@ -200,6 +189,7 @@ while True:
 
         logging.info("New metadata received")
         try:
+
             process_new_metadata(new_metadata)
         except Exception as e:
             logging.error("Error while processing new metadata: %s", e)

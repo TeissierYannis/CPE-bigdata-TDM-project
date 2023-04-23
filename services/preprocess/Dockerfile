@@ -4,10 +4,6 @@ FROM python
 # Set the working directory to /app
 WORKDIR /app
 
-# Install the required packages for cv2
-RUN apt-get update && \
-    apt-get install -y libgl1-mesa-glx libglib2.0-0 libsm6 libxrender1 libxext6
-
 # Copy the requirements file into the container
 COPY requirements.txt .
 
@@ -17,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code into the container
 COPY . .
 
-RUN pip install timm
+RUN python -m spacy download en_core_web_md
 
 # Start the Flask app when the container launches
 CMD sleep 10 && python app.py

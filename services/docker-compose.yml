@@ -8,6 +8,7 @@ services:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
     command: server /data
+    restart: always
     networks:
       default:
         aliases:
@@ -26,13 +27,13 @@ services:
     command: server
     depends_on:
       - minio
+    restart: always
     networks:
       default:
         aliases:
           - console
   postgres:
     image: postgres
-    restart: always
     ports:
       - "5432:5432"
     volumes:
@@ -42,6 +43,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: raw_metadata
+    restart: always
     networks:
       default:
         aliases:
@@ -55,6 +57,7 @@ services:
       - "8080:80"
     depends_on:
       - postgres
+    restart: always
     networks:
       default:
         aliases:
@@ -68,6 +71,7 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    restart: always
     networks:
       default:
         aliases:
@@ -89,6 +93,7 @@ services:
       SQL_PORT: 3306
     volumes:
       - ./shared:/app/shared
+    restart: always
     networks:
       default:
         aliases:
@@ -140,6 +145,7 @@ services:
       - "3000:3000"
     environment:
       MILVUS_ADDRESS: standalone:19530
+    restart: always
     networks:
       default:
         aliases:
@@ -162,6 +168,7 @@ services:
       VISUALIZE_SERVICE_URL: http://visualize:4003/
       RECOMMEND_SERVICE_URL: http://recommend:4004/
       CDN_SERVICE_URL: http://cdn:4006/
+    restart: always
     networks:
       default:
         aliases:
@@ -181,6 +188,7 @@ services:
       SQL_PORT: 3306
     volumes:
       - ./shared:/app/shared # Replace the shared_volume volume with a host directory
+    restart: always
     networks:
       default:
         aliases:
@@ -200,6 +208,8 @@ services:
       - visualize
       - gateway
       - harvest
+    environment:
+      GENSIM_DATA_DIR: /app
     networks:
       default:
         aliases:
@@ -218,6 +228,7 @@ services:
       SQL_PORT: 3306
     volumes:
       - ./shared:/app/shared # Replace the shared_volume volume with a host directory
+    restart: always
     networks:
       default:
         aliases:
@@ -235,6 +246,7 @@ services:
       SQL_PASSWORD: bigdatapassword
       SQL_DATABASE: bigdata
       SQL_PORT: 3306
+      GENSIM_DATA_DIR: /app
     volumes:
       - ./shared:/app/shared # Replace the shared_volume volume with a host directory
     networks:
@@ -248,6 +260,7 @@ services:
       - postgres
       - standalone
       - tools
+    restart: always
     networks:
       default:
         aliases:
@@ -270,6 +283,7 @@ services:
       - recommend
     ports:
       - "4005:4005"
+    restart: always
     networks:
       default:
         aliases:
@@ -293,6 +307,7 @@ services:
       - recommend
     ports:
       - "4006:4006"
+    restart: always
     networks:
       default:
         aliases:

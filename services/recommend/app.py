@@ -1,38 +1,18 @@
 import os
 import sys
 
-import pandas as pd
 from flask import Flask, jsonify, request
-from mysql.connector import pooling
 from dotenv import load_dotenv
-from collections import namedtuple
-import ast
-from pymilvus import DataType, Collection, CollectionSchema, FieldSchema, connections, utility, IndexType, SearchResult
+from pymilvus import DataType, Collection, CollectionSchema, FieldSchema, connections, utility
 import numpy as np
 import logging
-from transformers import PreTrainedTokenizerFast
-from sklearn.preprocessing import OneHotEncoder
+import spacy
 
 load_dotenv()
 
 app = Flask(__name__)
 
 logging.basicConfig(level=logging.DEBUG, format='%(levelname)s - %(message)s')
-
-labels = ['N/A', 'person', 'traffic light', 'fire hydrant', 'street sign', 'stop sign', 'parking meter', 'bench',
-          'bird', 'cat', 'dog', 'horse', 'bicycle', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'hat',
-          'backpack', 'umbrella', 'shoe', 'car', 'eye glasses', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis',
-          'snowboard', 'sports ball', 'kite', 'baseball bat', 'motorcycle', 'baseball glove', 'skateboard', 'surfboard',
-          'tennis racket', 'bottle', 'plate', 'wine glass', 'cup', 'fork', 'knife', 'airplane', 'spoon', 'bowl',
-          'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'bus', 'donut', 'cake',
-          'chair', 'couch', 'potted plant', 'bed', 'mirror', 'dining table', 'window', 'desk', 'train', 'toilet',
-          'door', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'truck', 'toaster',
-          'sink', 'refrigerator', 'blender', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'boat',
-          'toothbrush']
-
-tokenizer = PreTrainedTokenizerFast.from_pretrained("bert-base-uncased")
-tokenizer.add_tokens(labels)
-
 
 def release_collection(collection_name):
     if utility.has_collection(collection_name):
@@ -50,7 +30,7 @@ def connect_to_milvus():
             fields=[
                 FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
                 FieldSchema(name="filename", dtype=DataType.VARCHAR, max_length_per_row=200, max_length=200),
-                FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=21),
+                FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=1516),
             ],
             description="Collection for metadata vectors",
         )
@@ -101,6 +81,19 @@ def hex_to_rgb(hex):
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
 
+def words_to_embeddings(words):
+    words = [word.replace(' ', '') for word in words]
+    # Generate embeddings for each word
+    embeddings = []
+    nlp = spacy.load("en_core_web_md")
+    for word in words:
+        try:
+            m = nlp(word).vector
+            embeddings.append(m)
+        except KeyError:
+            embeddings.append(np.zeros(300))
+    return embeddings
+
 def vectorize_preferences(preferences):
     width = normalize_scale(preferences['imagewidth'], 1000000)
     height = normalize_scale(preferences['imageheight'], 1000000)
@@ -120,19 +113,16 @@ def vectorize_preferences(preferences):
     # Remove duplicates
     tags = list(dict.fromkeys(tags))
     logging.info("Tags: {}".format(tags))
-
-    # Use OneHotEncoder to encode the tags (but use only the first 5)
     max_tags = 5
-    labels_array = np.array(labels).reshape(-1, 1)
-    encoder = OneHotEncoder(sparse=False)
-    encoder.fit(labels_array)
-    tags_array = np.array(tags).reshape(-1, 1)
-    result = encoder.transform(tags_array)
-    logging.info("Tags: {}".format(result))
-    # convert to array of float
-    tokenized_tags = result.toarray().tolist()[0]
-    logging.info("Tags: {}".format(tokenized_tags))
-    tokenized_tags = custom_padding(tokenized_tags, max_tags)
+    # If the tags list is not equal to 5, fill it with 'N/A' tags
+    for i in range(max_tags):
+        if len(tags) < max_tags:
+            tags.append('N/A')
+
+    logging.info(tags)
+    embedding = words_to_embeddings(tags)
+    # Embedding is a list of list, we want to flatten it
+    embedding = [item for sublist in embedding for item in sublist]
 
     logging.info("Width: {}".format(width))
     logging.info("Height: {}".format(height))
@@ -141,9 +131,9 @@ def vectorize_preferences(preferences):
     logging.info("R: {}".format(r))
     logging.info("G: {}".format(g))
     logging.info("B: {}".format(b))
-    logging.info("Tags: {}".format(tokenized_tags))
+    logging.info("Tags: {}".format(embedding))
 
-    vector = [width, height, orientation, make, r, g, b, r, g, b, r, g, b, r, g, b] + tokenized_tags
+    vector = [width, height, orientation, make, r, g, b, r, g, b, r, g, b, r, g, b] + embedding
 
     return vector
 
