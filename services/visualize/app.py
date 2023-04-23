@@ -1,6 +1,6 @@
 import os
 import io
-
+import ast
 import spacy
 import folium
 import datetime
@@ -582,6 +582,23 @@ def graph_images_size_dynamic(nb_intervals=7, graph_type='all'):
         return Response("Invalid graph type", 400)
 
 
+def convert_to_year(date_str):
+    """
+    Convert a date string to a year
+
+    :param date_str: The date string to convert
+    :return: The year as an integer
+    """
+    try:
+        dt = pd.to_datetime(date_str)
+        if dt.year >= 1678:  # To avoid OutOfBoundsDatetime error
+            return dt.year
+        else:
+            return None
+    except:
+        return None
+
+
 @app.route('/graph/year', methods=['GET'])
 @app.route('/graph/year/<nb_intervals>/<graph_type>', methods=['GET'])
 def graph_images_year(nb_intervals=10, graph_type='all'):
@@ -599,7 +616,10 @@ def graph_images_year(nb_intervals=10, graph_type='all'):
     nb_intervals = interval_check_to_int(nb_intervals)
 
     # Extract year from the 'DateTime' column and create a new 'Year' column
-    df_meta['Year'] = pd.DatetimeIndex(df_meta['DateTimeOriginal']).year
+    df_meta['Year'] = df_meta['DateTimeOriginal'].apply(convert_to_year)
+
+    # Remove rows with invalid years (None)
+    df_meta = df_meta.dropna(subset=['Year'])
 
     # Group the data by year and count the number of images for each year
     image_count = df_meta.groupby('Year').size().reset_index(name='count')[:nb_intervals]
@@ -733,6 +753,9 @@ def get_coordinates(df_meta, country=False):
                 and longitude is not None and not np.isnan(longitude) and longitude != 0.0:
             coords.update({file: [lattitude, longitude, altitude]})
 
+    if len(coords) == 0:
+        return None
+
     if country:
         return get_country(coords)
     else:
@@ -746,6 +769,7 @@ def get_country(coordinates):
     :param coordinates: The coordinates to get the country from
     :return: The coordinates with the country added
     """
+
     # Create a geolocator
     geolocator = Nominatim(user_agent="geoapiExercises")
     coordinates_list = coordinates.copy()
@@ -774,6 +798,9 @@ def display_coordinates_on_map():
 
     coordinates_list = get_coordinates(df_meta, False)
 
+    if coordinates_list is None:
+        return Response("No coordinates found", 400)
+
     # create a map centered at a specific location
     m = folium.Map(location=[0, 0], zoom_start=1)
 
@@ -799,6 +826,9 @@ def graph_images_countries(nb_inter=5, graph='all'):
     """
     df_meta = get_metadata()
     coord_list = get_coordinates(df_meta, True)
+
+    if coord_list is None:
+        return Response("No coordinates found", 400)
 
     graph = graph_type_check(graph)
     nb_inter = interval_check_to_int(nb_inter)
@@ -841,6 +871,9 @@ def graph_images_altitudes(nb_inter=5, graph='all'):
     """
     df_meta = get_metadata()
     coord_list = get_coordinates(df_meta, False)
+
+    if coord_list is None:
+        return Response("No coordinates found", 400)
 
     graph = graph_type_check(graph)
     nb_inter = interval_check_to_int(nb_inter)
@@ -1033,12 +1066,14 @@ def graph_top_tags(nb_inter=5, graph='all'):
 
     nb_inter = interval_check_to_int(nb_inter)
 
-    all_tags = []
-    for tags in df_meta['tags']:
-        if tags is not None and tags is not np.nan and isinstance(tags, list) and len(tags) > 0:
-            all_tags += tags
-
-    top_tags = dict(collections.Counter(all_tags).most_common(nb_inter))
+    # get top nb_inter tags
+    tags = df_meta['tags'].dropna()  # Remove NaN values
+    # Convert string representation of lists to actual lists
+    tags = tags.apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+    # Flatten the list of lists and remove empty strings
+    all_tags = pd.Series([tag for sublist in tags for tag in sublist if tag != '[]'])
+    # Get the most frequent tags
+    top_tags = all_tags.value_counts().nlargest(nb_inter).to_dict()
 
     title = 'Top Tags'
     x_label = 'Tag'
@@ -1073,7 +1108,8 @@ def categorize_tags(df_meta, categories_list: list):
     all_tags = []
     for tags in df_meta['tags']:
         try:
-            tags = eval(tags)
+            if isinstance(tags, str):
+                tags = eval(tags)
             if tags is not None and tags is not np.nan:
                 all_tags += tags
         except:
