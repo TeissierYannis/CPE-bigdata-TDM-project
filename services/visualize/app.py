@@ -263,6 +263,7 @@ def fig_to_buffer(fig):
     :return: The buffer
     """
     buf = io.BytesIO()
+    fig.tight_layout()
     fig.savefig(buf, format='png')
     buf.seek(0)
 
@@ -470,8 +471,15 @@ def graph_images_size_static(interval_size=3000, nb_intervals=2):
     # Get the metadata
     df_meta = get_metadata()
 
-    # Check intervals value
+    # check values
     nb_intervals = interval_check_to_int(nb_intervals)
+
+    # Convert 'ImageHeight' and 'ImageWidth' to numeric values
+    df_meta['ImageHeight'] = pd.to_numeric(df_meta['ImageHeight'], errors='coerce')
+    df_meta['ImageWidth'] = pd.to_numeric(df_meta['ImageWidth'], errors='coerce')
+
+    # Drop rows with missing values
+    df_meta = df_meta.dropna(subset=['ImageHeight', 'ImageWidth'])
 
     try:
         interval_size = int(interval_size)
@@ -520,6 +528,13 @@ def graph_images_size_dynamic(nb_intervals=7, graph_type='all'):
     # check values
     nb_intervals = interval_check_to_int(nb_intervals)
     graph_type = graph_type_check(graph_type)
+
+    # Convert 'ImageHeight' and 'ImageWidth' to numeric values
+    df_meta['ImageHeight'] = pd.to_numeric(df_meta['ImageHeight'], errors='coerce')
+    df_meta['ImageWidth'] = pd.to_numeric(df_meta['ImageWidth'], errors='coerce')
+
+    # Drop rows with missing values
+    df_meta = df_meta.dropna(subset=['ImageHeight', 'ImageWidth'])
 
     # Calculate the minimum size of each image and store it in a new column
     df_meta['min_size'] = df_meta[['ImageHeight', 'ImageWidth']].min(axis=1)
@@ -587,8 +602,7 @@ def graph_images_year(nb_intervals=10, graph_type='all'):
     df_meta['Year'] = pd.DatetimeIndex(df_meta['DateTimeOriginal']).year
 
     # Group the data by year and count the number of images for each year
-    image_count = df_meta.groupby('Year').size().reset_index(name='count').sort_values('count', ascending=False)[
-                  :nb_intervals]
+    image_count = df_meta.groupby('Year').size().reset_index(name='count')[:nb_intervals]
     image_count['Year'] = image_count['Year'].astype(int)
 
     # Set the title of the graph
@@ -611,7 +625,7 @@ def graph_images_year(nb_intervals=10, graph_type='all'):
 
     elif graph_type == 'curve':
         # Display a line chart using a custom function 'display_curve'
-        image_count = df_meta.groupby('Year').size().reset_index(name='count').sort_values('Year', ascending=True)
+        image_count = df_meta.groupby('Year').size().reset_index(name='count')
         buffer = display_curve(title=title, x_label=x_label, y_label=y_label, x_values=image_count['Year'],
                                y_values=image_count['count'])
         return Response(buffer.getvalue(), mimetype='image/png')
@@ -628,7 +642,6 @@ def graph_images_year(nb_intervals=10, graph_type='all'):
         buffer_pie = display_pie(title=title, values=image_count['count'], labels=image_count['Year'])
 
         # Line chart
-        image_count = image_count.sort_values('Year', ascending=True)
         buffer_line = display_curve(title=title, x_label=x_label, y_label=y_label, x_values=image_count['Year'],
                                     y_values=image_count['count'])
 
@@ -716,8 +729,8 @@ def get_coordinates(df_meta, country=False):
             df_meta['Longitude'],
             df_meta['Altitude']
     ):
-        if lattitude is not None and not np.isnan(lattitude) \
-                and longitude is not None and not np.isnan(longitude):
+        if lattitude is not None and not np.isnan(lattitude) and lattitude != 0.0 \
+                and longitude is not None and not np.isnan(longitude) and longitude != 0.0:
             coords.update({file: [lattitude, longitude, altitude]})
 
     if country:
@@ -1022,7 +1035,7 @@ def graph_top_tags(nb_inter=5, graph='all'):
 
     all_tags = []
     for tags in df_meta['tags']:
-        if tags is not None and tags is not np.nan:
+        if tags is not None and tags is not np.nan and isinstance(tags, list) and len(tags) > 0:
             all_tags += tags
 
     top_tags = dict(collections.Counter(all_tags).most_common(nb_inter))
