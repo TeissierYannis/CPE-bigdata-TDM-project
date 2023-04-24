@@ -38,10 +38,6 @@ def get_file(filename):
         return jsonify({'status': 'error', 'message': 'file not found'})
 
 
-@app.route('/api/v1/health', methods=['GET'])
-def health():
-    return jsonify({'status': 'ok'})
-
 
 if __name__ == '__main__':
     app.run(debug=True)
