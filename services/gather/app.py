@@ -130,6 +130,11 @@ def status():
     return {'status': 'error', 'message': 'No download task is currently running'}
 
 
+@app.route('/api/v1/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok'})
+
+
 if __name__ == '__main__':
     sharedprogress.SharedProgress().set_status('stopped')
     app.run(debug=False)

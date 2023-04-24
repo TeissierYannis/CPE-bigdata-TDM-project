@@ -203,5 +203,10 @@ def recommend():
     return jsonify(id_to_filename)
 
 
+@app.route('/api/v1/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok'})
+
+
 if __name__ == '__main__':
     app.run(debug=False)

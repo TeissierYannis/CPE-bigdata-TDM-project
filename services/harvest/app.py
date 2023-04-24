@@ -207,6 +207,11 @@ def process_image():
         }), 500
 
 
+@app.route('/api/v1/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok'})
+
+
 @celery.task(bind=True, name='app.process_image_task')
 def process_image_task(self, image_filename):
     logging.debug({'task_id': self.request.id, 'filename': image_filename, 'status': 'started'})

@@ -18,7 +18,7 @@ from geopy.geocoders import Nominatim
 from sqlalchemy.orm import sessionmaker
 from scipy.spatial.distance import pdist
 from sqlalchemy import create_engine, text
-from flask import Flask, Response, request, send_file
+from flask import Flask, Response, request, send_file, jsonify
 from scipy.cluster.hierarchy import dendrogram, linkage
 
 load_dotenv()
@@ -1195,6 +1195,11 @@ def graph_categorized_tags():
 
     # Return the buffer contents as a response
     return Response(buffer.getvalue(), mimetype='image/png')
+
+
+@app.route('/api/v1/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok'})
 
 
 if __name__ == '__main__':
