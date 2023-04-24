@@ -16,7 +16,9 @@ Wait for all services to be up and running. (30seconds to 1 minute)
 ```bash
 curl 127.0.0.1:81/gather/download
 ```
-Follow the progress of the download : 
+
+Follow the progress of the download :
+
 ```bash
 curl 127.0.0.1:81/gather/status
 ```
@@ -28,6 +30,17 @@ docker-compose logs -f harvest_worker_service
 ```
 
 ## Endpoints
+
+You will find a postman library to test each of the following endpoints.
+
+They all have a '/api/v1/health' endpoint to check if the service is up and running.
+So you can run the following command to check the status of the service :
+
+```bash
+curl http://127.0.0.1:81/<service>/api/v1/health
+```
+
+service list : gather, cdn, recommend or visualize
 
 ### Gather
 
@@ -84,6 +97,7 @@ curl --location 'http://127.0.0.1:81/recommend/recommend' \
     }
 }'
 ```
+
 This will return a list of images id that match the preferences.
 
 ### Visualise
@@ -91,117 +105,168 @@ This will return a list of images id that match the preferences.
 The visualise service is available through many endpoints :
 
 - **images size static**:
+
 ```bash
 curl http://127.0.0.1:81/visualize/graph/size/static
 ```
-or 
+
+or
+
 ```bash
 curl http://127.0.0.1:81/visualize/graph/size/static/<interval_size>/<nb_intervals>
 ```
+
 This will return a graph of the number of images per size interval.
 
 - **images size dynamic**:
+
 ```bash
 curl http://127.0.0.1:81/graph/size
 ```
+
 or
+
 ```bash
 curl http://127.0.0.1:81/graph/size/dynamic
 ```
+
 or
+
 ```bash
 curl http://127.0.0.1:81/graph/size/dynamic/<nb_intervals>/<graph_type>
 ```
+
 This will return a graph of the number of images per size interval.
 The intervals are dynamically calculated.
 You can choose the number of intervals and the type of graph (bar, pie or all)
 
 - **images year**:
+
 ```bash
 curl http://127.0.0.1:81/graph/year
 ```
-or 
+
+or
+
 ```bash
 curl http://127.0.0.1:81/graph/year/<nb_intervals>/<graph_type>
 ```
+
 This will return a graph of the number of images per year.
 You can choose the number of intervals and the type of graph (bar, pie, curve or all)
 
 - **Camera brand**:
+
 ```bash
 curl http://127.0.0.1:81/graph/brand
 ```
-or 
+
+or
+
 ```bash
 curl http://127.0.0.1:81/graph/brand/<nb_columns>/<graph_type>
 ```
+
 This will return a graph of the number of images per camera brand.
 You can choose the number of columns and the type of graph (bar, pie or all)
 
 - **Map of the images**:
+
 ```bash
 curl http://127.0.0.1:81/map
 ```
+
 This will return a html map of the images with the gps coordinates.
 The simplest way to see the map is to use this request in a browser.
 
 - **images countries**:
+
 ```bash
 curl http://127.0.0.1:81/graph/countries
 ```
+
 or
+
 ```bash
 curl http://127.0.0.1:81/graph/countries/<nb_countries>/<graph_type>
 ```
+
 This will return a graph of the number of images per country.
 It will take a bit of time because it needs to get the country of each image using the gps coordinates.
 You can choose the number of countries and the type of graph (bar, pie or all)
 
 - **images altitude**:
+
 ```bash
 curl http://127.0.0.1:81/graph/altitude
 ```
+
 or
+
 ```bash
 curl http://127.0.0.1:81/graph/altitude/<nb_intervals>/<graph_type>
 ```
+
 This will return a graph of the number of images per altitude interval.
 You can choose the number of intervals and the type of graph (histogram, pie or all)
 
 - **images dominant color**:
+
 ```bash
 curl http://127.0.0.1:81/graph/dominant_color
 ```
+
 or
+
 ```bash
 curl http://127.0.0.1:81/graph/dominant_color/<nb_colors>/<graph_type>
 ```
+
 This will return a graph of the dominant color of the images.
 You can choose the number of colors and the type of graph (bar, treemap or all)
 
 - **images tags**:
+
 ```bash
 curl http://127.0.0.1:81/graph/tags/top
 ```
+
 or
+
 ```bash
 curl http://127.0.0.1:81/graph/tags/top/<nb_tags>/<graph_type>
 ```
+
 This will return a graph of the most common object in the images.
 You can choose the number of tags and the type of graph (bar, pie or all)
 
 - **images dendrogram of tags**:
+
 ```bash
 curl http://127.0.0.1:81/graph/tags/dendrogram
 ```
+
 This will return a dendrogram of the tags of the images.
 It will take a bit of time because it needs to classify the tags of each image.
 you can put a list of categories in the body of the request if you want to use your own categories :
+
 ```json
 {
-"list" : ["Fruit","Animal","Electronics","Furniture","Vehicle","Clothing","Sport","Kitchen","Outdoor","Accessory"]
+  "list": [
+    "Fruit",
+    "Animal",
+    "Electronics",
+    "Furniture",
+    "Vehicle",
+    "Clothing",
+    "Sport",
+    "Kitchen",
+    "Outdoor",
+    "Accessory"
+  ]
 }
 ```
+
 The default categories are the ones above.
 
 

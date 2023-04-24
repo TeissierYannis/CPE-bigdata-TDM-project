@@ -14,13 +14,14 @@
 \title{Massive data processing \\ with the Unsplash dataset}
 \author{Yannis TEISSIER \& Wolodia ZDETOVETZKY}
 \date{03/2023}
-
+\setcounter{tocdepth}{2}
 
 \begin{document}
 
     \maketitle
     \tableofcontents
     \newpage
+
 
     \section{Introduction}\label{sec:introduction}
 
@@ -32,39 +33,22 @@
     Throughout the project, we continuously assess the performance of the models and the overall user experience, making necessary adjustments to ensure optimal outcomes.
     This report provides a detailed overview of the project's objectives, methods, results, and conclusions, as well as an evaluation of the practical sessions and exercises carried out during the course.
 
+
     \section{Objectives}\label{sec:objectives}
 
     In this project, we aimed to develop a comprehensive image recommendation system based on the Unsplash image dataset, taking into account user preferences.
     The following steps explain the objectives we pursued in order to achieve this goal.
 
-    \textbf{Data Collection}\\
-    Our first objective was to efficiently collect and process the large volume of data available in the Unsplash image dataset.
-    We achieved this by parallelling the download process across multiple processes to enhance performance.
-
-    \textbf{Data Annotation}\\
-    To enrich the dataset, we aimed to automatically annotate the images with relevant metadata.
-    This involved using Facebook's Detr AI for image recognition, which allowed us to generate descriptive tags for each image.
-
-    \textbf{Dominant Color Extraction}\\
-    We aimed to identify the four most dominant colors in each image to further enrich the metadata.
-    To achieve this, we employed the K-means clustering algorithm,
-    which allowed us to determine the most representative colors in each image effectively.
-
-    \textbf{Data Visualization}\\
-    We sought to expand the data visualization capabilities to align with the most relevant metadata obtained during the annotation and color extraction processes.
-    This objective aimed to facilitate a better understanding of the dataset characteristics and user preferences.
-
-    \textbf{Recommendation System Development}\\
-    A central objective of this project was the development of an effective image recommendation system.
-    We explored various techniques, such as Euclidean distance, cosine similarity, and Reinforcement Learning, to identify the best approach for providing personalized image recommendations to users.
-
-    \textbf{Web Interface Implementation}\\
-    The creation of a user-friendly web interface was our objective, enabling users to define their profiles and receive image recommendations.
+    \begin{itemize}
+        \item \textbf{Data Collection}: Our first objective was to efficiently collect and process the large volume of data available in the Unsplash image dataset.\\We achieved this by parallelling the download process across multiple processes to enhance performance.
+        \item \textbf{Data Annotation}: To enrich the dataset, we aimed to automatically annotate the images with relevant metadata. This involved using Facebook's Detr AI for image recognition, which allowed us to generate descriptive tags for each image.
+        \item \textbf{Dominant Color Extraction}: We aimed to identify the four most dominant colors in each image to further enrich the metadata. To achieve this, we employed the K-means clustering algorithm, which allowed us to determine the most representative colors in each image effectively.
+        \item \textbf{Data Visualization}:  We sought to expand the data visualization capabilities to align with the most relevant metadata obtained during the annotation and color extraction processes. This objective aimed to facilitate a better understanding of the dataset characteristics and user preferences.
+        \item \textbf{Recommendation System Development}: A central objective of this project was the development of an effective image recommendation system. We explored various techniques, such as Euclidean distance, cosine similarity, and Reinforcement Learning, to identify the best approach for providing personalized image recommendations to users.
+        \item \textbf{Web Interface Implementation}: The creation of a user-friendly web interface was our objective, enabling users to define their profiles and receive image recommendations.
+    \end{itemize}
 
     In annexe, you will find the~\hyperref[subsec:target_architecture]{\nameref{subsec:target_architecture}} proposed by the initial subject, followed by the~\hyperref[subsec:actual_architecture]{\nameref{subsec:actual_architecture}} of the project.
-
-    \newpage
-
 
     \section{Data}\label{sec:data}
 
@@ -116,7 +100,7 @@
         \item \textbf{Spacy}: The \("\)en\_core\_web\_md\("\) model, version 3.5.0, is a medium-sized (40 MB) English natural language processing model developed by Explosion and distributed under the MIT license.\\Optimized for CPU performance, it incorporates multiple components to perform various NLP tasks, such as tokenization, part-of-speech tagging, named entity recognition, and lemmatisation.\\The model is pretrained on web-based text data and includes 300-dimensional word vectors.\\Its performance is evaluated in terms of accuracy, recall, and F-score, with a tokenization accuracy of 1.00 and an F-score of 0.85 for named entity recognition.\\This model was chosen over other models offered by spaCy as it provided the best balance between size and performance, given the resources available for our project.
         \item \textbf{Mini-batch K-means}: According to the performance report between K-Means and Mini-batch K-Means available \href{https://upcommons.upc.edu/bitstream/handle/2117/23414/R13-8.pdf}{here}, KMeans generally produces a higher level of cluster coherence, as indicated by smaller intra-cluster distances and higher silhouette scores.\\However, MiniBatchKMeans has a significant advantage in terms of computational efficiency, with shorter processing times and lower memory requirements.\\As such, we decided to use MiniBatchKMeans to promote the processing speed of our model.
         \item \textbf{Detr}: Concerning Detr, we use a list of 91 different objects on which the model is trained.\\In particular, it has been trained on COCO 2017 object detection, a dataset consisting of 118k/5k annotated images for training/validation respectively.\\This model achieves an AP (average precision) of 42.0 on COCO 2017 validation.\\Here is the list of recognized objects:\\N/A, person, traffic light, fire hydrant, street sign, stop sign, parking meter, bench, bird, cat, dog, horse, bicycle, sheep, cow, elephant, bear, zebra, giraffe, hat, backpack, umbrella, shoe, car, eye glasses, handbag, tie, suitcase, frisbee, skis, snowboard, sports ball, kite, baseball bat, motorcycle, baseball glove, skateboard, surfboard, tennis racket, bottle, plate, wine glass, cup, fork, knife, airplane, spoon, bowl, banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, bus, donut, cake, chair, couch, potted plant, bed, mirror, dining table, window, desk, train, toilet, door, tv, laptop, mouse, remote, keyboard, cell phone, microwave, oven, truck, toaster, sink, refrigerator, blender, book, clock, vase, scissors, teddy bear, hair drier, boat, toothbrush.
-        \item \textbf{Visualisation}: The collection of all these data also allowed us to visualize them and to obtain an overall vision of them through the graphs.\\We note in particular that the majority of the images were taken between in 2019 by Canon cameras and enormously in the USA. They were taken in large majority between 0 and 2000m of altitude, often represents people. The colors are mostly black, shades of gray and green.\\You will find some of these representations in Appendix ~~hyperref[subsec:Graphs]{\nameref{subsec:graphs}}.
+        \item \textbf{Visualisation}: The collection of all these data also allowed us to visualize them and to obtain an overall vision of them through the graphs.\\We note in particular that the majority of the images were taken between in 2019 by Canon cameras and enormously in the USA. They were taken in large majority between 0 and 2000m of altitude, often represents people. The colors are mostly black, shades of gray and green.\\You will find some of these representations in Appendix ~\hyperref[subsec:Graphs]{\nameref{subsec:graphs}}.
     \end{itemize}
 
     Thus, in general, these metrics allowed us to guide our choice of models.
@@ -218,7 +202,6 @@
     \end{figure}
 
     \newpage
-
 
     \subsubsection{Top years}\label{subsubsec:top_years}
 
