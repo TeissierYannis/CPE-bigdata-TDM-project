@@ -29,6 +29,17 @@ Now, look at the harvest_worker_services logs to see the progress of the harvest
 docker-compose logs -f harvest_worker_service
 ```
 
+### Front-end
+
+To access the front end, on your browser, go to the following url :
+
+```
+http://127.0.0.1:4005
+```
+
+You will find an interface to test the recommend service.
+Please do not use it before the download is finished.
+
 ## Endpoints
 
 You will find a postman library to test each of the following endpoints.
