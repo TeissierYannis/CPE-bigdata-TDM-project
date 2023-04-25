@@ -1,215 +1,125 @@
 "use client";
 
-import {Inter} from 'next/font/google';
-import React, {useState} from 'react';
-import Loader from "@/app/components/loader";
-import Recommendations from "@/app/components/recommendations";
+import Image from 'next/image'
+import { Inter } from 'next/font/google'
+import {useEffect} from "react";
 
-const axios = require('axios');
-
-const inter = Inter({subsets: ['latin']});
+const inter = Inter({ subsets: ['latin'] })
 
 export default function Home() {
-    const [step, setStep] = useState(1);
-    const [isLoading, setIsLoading] = useState(false);
-    const [recommendations, setRecommendations] = useState<string[]>([]);
 
-    const [name, setName] = useState('');
-    const [hexColor, setHexColor] = useState('');
-    const [words, setWords] = useState([]);
-    const [currentWord, setCurrentWord] = useState('');
-    const [width, setWidth] = useState(0);
-    const [height, setHeight] = useState(0);
-    const [make, setMake] = useState('');
-
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        console.log(name, hexColor, words, width, height, make);
-
-        // TODO
-        const prefOrientation = 0;
-
-        setIsLoading(true);
-        const preferences = {
-            dominant_color: hexColor,
-            imagewidth: width,
-            imageheight: height,
-            orientation: prefOrientation,
-            tags: words,
-            make: make,
-        };
-
-        axios.post('http://127.0.0.1:81/recommend/recommend', {preferences})
-            .then(function (response: any) {
-                console.log(response.data);
-                // store only values
-                setRecommendations(Object.values(response.data));
-            })
-            .catch(function (error: any) {
-                console.error(error);
-            })
-            .finally(function () {
-                setIsLoading(false);
-            });
-    };
-
-    const onNext = () => {
-        setStep(step + 1);
-    };
-
-    const onPrevious = () => {
-        setStep(step - 1);
-    };
-
-    // Update the handleWords function
-    const handleWords = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            // if there is more than 5 words, don't add more
-            if (words.length >= 5) return;
-            // @ts-ignore
-            setWords([...words, currentWord]);
-            setCurrentWord('');
-        }
-    };
+    // redirect to /recommend
+    useEffect(() => {
+        window.location.href = '/recommend';
+    }, []);
 
     return (
         <main className="flex min-h-screen flex-col items-center justify-between p-24">
-            {isLoading ? (
-                <Loader/>
-            ) : recommendations.length === 0 ? (
-
-                <div className="flex flex-col items-center justify-center">
-                    <h1 className="text-6xl font-bold text-center mb-5">Recommender system</h1>
-                    <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
-                        {step === 1 && (
-                            <div className="flex flex-col space-y-2">
-                                <label htmlFor="name">Name:</label>
-                                <input
-                                    className="text-black w-full p-3 border-2 border-blue-500 rounded-md focus:outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-300 shadow-md transition duration-200 ease-in-out"
-                                    type="text"
-                                    id="name"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                />
-                            </div>
-                        )}
-                        {step === 2 && (
-                            <div className="flex space-y-2">
-                                <label htmlFor="color" className="mt-auto mr-2">Color:</label>
-                                <div className="relative w-16 h-8">
-                                    <input
-                                        type="color"
-                                        id="color"
-                                        value={hexColor}
-                                        onChange={(e) => setHexColor(e.target.value)}
-                                        className="w-full h-full opacity-0 absolute left-0 top-0 cursor-pointer"
-                                    />
-                                    <div
-                                        className="w-full h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-md shadow-md"
-                                        style={{background: hexColor}}
-                                    ></div>
-                                </div>
-                            </div>
-                        )}
-                        {step === 3 && (
-                            <div className="flex flex-col space-y-2">
-                                <label htmlFor="words">Words:</label>
-                                <div className="relative">
-                                    <input
-                                        className="text-black w-full p-3 border-2 border-blue-500 rounded-md focus:outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-300 shadow-md transition duration-200 ease-in-out"
-                                        type="text"
-                                        id="words"
-                                        value={currentWord}
-                                        onChange={(e) => setCurrentWord(e.target.value)}
-                                        onKeyDown={handleWords}
-                                    />
-                                    <div className="flex flex-wrap mt-2">
-                                        {words.map((word, index) => (
-                                            <div
-                                                key={index}
-                                                className="bg-blue-500 text-white px-3 py-1 mr-2 mb-2 rounded-full flex items-center space-x-2"
-                                            >
-                                                <span>{word}</span>
-                                                <button
-                                                    className="focus:outline-none"
-                                                    onClick={() =>
-                                                        setWords(words.filter((_, wordIndex) => wordIndex !== index))
-                                                    }
-                                                >
-                                                    <span className="font-bold">&times;</span>
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        {step === 4 && (
-                            <div className="flex flex-col space-y-2">
-                                <label htmlFor="width">Width:</label>
-                                <input
-                                    className="text-black w-full p-3 border-2 border-blue-500 rounded-md focus:outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-300 shadow-md transition duration-200 ease-in-out"
-                                    type="number"
-                                    min="0"
-                                    id="width"
-                                    value={width}
-                                    onChange={(e) => setWidth(parseInt(e.target.value))}
-                                />
-                                <label htmlFor="height">Height:</label>
-                                <input
-                                    className="text-black w-full p-3 border-2 border-blue-500 rounded-md focus:outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-300 shadow-md transition duration-200 ease-in-out"
-                                    type="number"
-                                    min="0"
-                                    id="height"
-                                    value={height}
-                                    onChange={(e) => setHeight(parseInt(e.target.value))}
-                                />
-                            </div>
-                        )}
-                        {step === 5 && (
-                            <div className="flex flex-col space-y-2">
-                                <label htmlFor="make">Make:</label>
-                                <input
-                                    className="text-black w-full p-3 border-2 border-blue-500 rounded-md focus:outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-300 shadow-md transition duration-200 ease-in-out"
-                                    type="text"
-                                    id="make"
-                                    value={make}
-                                    onChange={(e) => setMake(e.target.value)}
-                                />
-                            </div>
-                        )}
-                        <div className="flex space-x-4">
-                            {step > 1 && (
-                                <button type="button" className="bg-blue-500 text-white px-4 py-2 rounded"
-                                        onClick={onPrevious}>
-                                    Previous
-                                </button>
-                            )}
-                            {step < 5 && (
-                                <button type="button" className="bg-green-500 text-white px-4 py-2 rounded"
-                                        onClick={onNext}>
-                                    Next
-                                </button>
-                            )}
-                            {step === 5 &&
-                                <button type="submit"
-                                        className="bg-green-500 text-white px-4 py-2 rounded">Submit</button>}
-                        </div>
-                    </form>
+            <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
+                <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
+                    Get started by editing&nbsp;
+                    <code className="font-mono font-bold">src/app/page.tsx</code>
+                </p>
+                <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
+                    <a
+                        className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
+                        href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        By{' '}
+                        <Image
+                            src="/vercel.svg"
+                            alt="Vercel Logo"
+                            className="dark:invert"
+                            width={100}
+                            height={24}
+                            priority
+                        />
+                    </a>
                 </div>
+            </div>
 
-            ) : (
-                <>
-                    {recommendations.length > 0 && (
-                        <div className="w-full max-w-4xl mt-8">
-                            <Recommendations recommendations={recommendations} setRecommendations={setRecommendations}/>
-                        </div>
-                    )}
-                </>
-            )}
+            <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px]">
+                <Image
+                    className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
+                    src="/next.svg"
+                    alt="Next.js Logo"
+                    width={180}
+                    height={37}
+                    priority
+                />
+            </div>
+
+            <div className="mb-32 grid text-center lg:mb-0 lg:grid-cols-4 lg:text-left">
+                <a
+                    href="https://beta.nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
+                    className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    <h2 className={`mb-3 text-2xl font-semibold`}>
+                        Docs{' '}
+                        <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
+              -&gt;
+            </span>
+                    </h2>
+                    <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
+                        Find in-depth information about Next.js features and API.
+                    </p>
+                </a>
+
+                <a
+                    href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+                    className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800 hover:dark:bg-opacity-30"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    <h2 className={`mb-3 text-2xl font-semibold`}>
+                        Learn{' '}
+                        <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
+              -&gt;
+            </span>
+                    </h2>
+                    <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
+                        Learn about Next.js in an interactive course with&nbsp;quizzes!
+                    </p>
+                </a>
+
+                <a
+                    href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
+                    className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    <h2 className={`mb-3 text-2xl font-semibold`}>
+                        Templates{' '}
+                        <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
+              -&gt;
+            </span>
+                    </h2>
+                    <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
+                        Explore the Next.js 13 playground.
+                    </p>
+                </a>
+
+                <a
+                    href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
+                    className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    <h2 className={`mb-3 text-2xl font-semibold`}>
+                        Deploy{' '}
+                        <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
+              -&gt;
+            </span>
+                    </h2>
+                    <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
+                        Instantly deploy your Next.js site to a shareable URL with Vercel.
+                    </p>
+                </a>
+            </div>
         </main>
-    );
+    )
 }
-
-

@@ -21,7 +21,6 @@ const Loader = () => {
         "Feature extraction in progress...",
         "Calculating the similarity scores...",
         "Filtering the most relevant items...",
-        "Collaborative filtering underway...",
         "Content-based recommendations loading...",
         "Just a few more moments...",
         "The AI is pondering your preferences...",
