@@ -1,4 +1,5 @@
 // Recommendations.js
+"use client";
 import React from 'react';
 const Page = ({}: {}) => {
 
@@ -15,7 +16,7 @@ const Page = ({}: {}) => {
     }
 
     return (
-        <>
+        <div>
             <div className="col-span-full">
                 <label htmlFor="cover-photo" className="block text-sm font-medium leading-6 text-white-900">Upload new
                     photo</label>
@@ -39,7 +40,7 @@ const Page = ({}: {}) => {
                     </div>
                 </div>
             </div>
-        </>
+        </div>
     );
 };
 

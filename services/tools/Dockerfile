@@ -26,5 +26,7 @@ RUN cp /app/build/exifextract /app/shared/exifextract
 
 RUN chmod +x /export_to_shared
 
+RUN cp /export_to_shared /app/export_to_shared
+
 # Launch sleep 20s to wait for the other services to be ready and close the container
-CMD sleep 20 && /export_to_shared
+CMD sleep 60 && /app/export_to_shared

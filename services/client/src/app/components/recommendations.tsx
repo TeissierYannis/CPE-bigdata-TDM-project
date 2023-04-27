@@ -1,4 +1,5 @@
 // Recommendations.js
+"use client";
 import React from 'react';
 
 const Recommendations = ({recommendations, setRecommendations}: {

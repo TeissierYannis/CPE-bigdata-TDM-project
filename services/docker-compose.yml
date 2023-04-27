@@ -282,7 +282,8 @@ services:
       - visualize
       - recommend
     ports:
-      - "4005:4005"
+      - "5005:5005"
+      - "8888:8888"
     restart: always
     networks:
       default:

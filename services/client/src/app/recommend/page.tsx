@@ -196,13 +196,13 @@ export default function Page() {
                 </div>
 
             ) : (
-                <>
+                <div>
                     {recommendations.length > 0 && (
                         <div className="w-full max-w-4xl mt-8">
                             <Recommendations recommendations={recommendations} setRecommendations={setRecommendations}/>
                         </div>
                     )}
-                </>
+                </div>
             )}
         </main>
     );
