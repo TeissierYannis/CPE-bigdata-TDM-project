@@ -40,8 +40,7 @@ const Graphs: React.FC = () => {
             const imagePromises = IMAGE_ROUTES.map((route) =>
                 axios.get(`http://127.0.0.1:81${route}`, {responseType: 'arraybuffer'})
             );
-
-            const htmlPromise = axios.get(`http://127.0.0.1:81${HTML_ROUTE}`);
+            const htmlPromise = axios.get(`http://127.0.0.1:81${HTML_ROUTE}`, {responseType: 'text'});
 
             const responses = await Promise.all([...imagePromises, htmlPromise]);
             const imageBuffers = responses.slice(0, -1).map((response) =>
@@ -78,11 +77,15 @@ const Graphs: React.FC = () => {
             <main className="p-8">
                 {images.map((src, index) => (
                     <div key={index} className="image-container mb-6 bg-white p-6 rounded-2xl shadow-md">
-                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold mb-4 text-center">{TITLES[index]}</h2>
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-4 text-center">{TITLES[index]}</h2>
                         <img src={src} alt={`Graph ${index + 1}`} className="w-4/5 mx-auto"/>
                     </div>
                 ))}
-                {htmlContent && <div dangerouslySetInnerHTML={{__html: htmlContent}}/>}
+                {htmlContent && (
+                    <div className="map-container mb-6 bg-white p-6 rounded-2xl shadow-md">
+                        <div className="map-content" dangerouslySetInnerHTML={{__html: htmlContent}}/>
+                    </div>
+                )}
             </main>
         </div>
     );
