@@ -73,12 +73,12 @@ const Graphs: React.FC = () => {
     }
 
     return (
-        <div className="container bg-black min-h-screen">
+        <div className="container bg-none min-h-screen justify-center">
             <Head>
                 <title>Images graphs</title>
             </Head>
 
-            <main className="p-8">
+            <main className="p-8 justify-center">
                 {images.map((src, index) => (
                     <div key={index} className="image-container mb-6 bg-white p-6 rounded-2xl shadow-md">
                         <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-4 text-center text-black">{TITLES[index]}</h2>
