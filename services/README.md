@@ -164,7 +164,7 @@ curl http://127.0.0.1:81/graph/year/<nb_intervals>/<graph_type>
 ```
 
 This will return a graph of the number of images per year.
-You can choose the number of intervals and the type of graph (bar, pie, curve or all)
+You can choose the number of intervals and the type of graph (bar, pie, curve, wordcloud or all)
 
 - **Camera brand**:
 
@@ -179,7 +179,7 @@ curl http://127.0.0.1:81/graph/brand/<nb_columns>/<graph_type>
 ```
 
 This will return a graph of the number of images per camera brand.
-You can choose the number of columns and the type of graph (bar, pie or all)
+You can choose the number of columns and the type of graph (bar, pie, wordcloud or all)
 
 - **Map of the images**:
 
@@ -234,7 +234,7 @@ curl http://127.0.0.1:81/graph/dominant_color/<nb_colors>/<graph_type>
 ```
 
 This will return a graph of the dominant color of the images.
-You can choose the number of colors and the type of graph (bar, treemap or all)
+You can choose the number of colors and the type of graph (bar, treemap, pie, wordcloud or all)
 
 - **images tags**:
 
@@ -249,7 +249,7 @@ curl http://127.0.0.1:81/graph/tags/top/<nb_tags>/<graph_type>
 ```
 
 This will return a graph of the most common object in the images.
-You can choose the number of tags and the type of graph (bar, pie or all)
+You can choose the number of tags and the type of graph (bar, pie, wordcloud or all)
 
 - **images dendrogram of tags**:
 

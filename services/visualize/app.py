@@ -14,6 +14,7 @@ from tqdm import tqdm
 from PIL import Image
 from dotenv import load_dotenv
 from collections import Counter
+from wordcloud import WordCloud
 from geopy.geocoders import Nominatim
 from sqlalchemy.orm import sessionmaker
 from scipy.spatial.distance import pdist
@@ -420,6 +421,52 @@ def display_tree_map(title, sizes, labels, colors, alpha=0.6):
     return fig_to_buffer(fig)
 
 
+def word_color_func(word, *args, **kwargs):
+    """
+    Get the corresponding color for a given word
+
+    :param word: color name to find the corresponding color
+    :return: the corresponding color in hex format
+    """
+    try:
+        color_hex = webcolors.name_to_hex(word)
+        return color_hex
+    except ValueError:
+        return 'black'
+
+
+def display_wordcloud(words, frequencies, background_color='white', max_words=200, word_to_color=False):
+    """
+    Display a word cloud
+
+    :param words: words to display
+    :param frequencies: frequencies of the words
+    :param background_color: background color of the word cloud
+    :param max_words: maximum number of words to display
+    :param word_to_color: if True, the words will be colored according to their name
+    :return: the word cloud as a buffer
+    """
+
+    # Set the color function to convert the words to colors if needed
+    if word_to_color:
+        color_func = word_color_func
+    else:
+        color_func = None
+
+    # Generate the word cloud
+    wordcloud = WordCloud(
+        background_color=background_color,
+        max_words=max_words,
+        color_func=color_func,  # Add the color_func parameter
+    ).generate_from_frequencies(dict(zip(words, frequencies)))
+
+    # Save the word cloud to a buffer
+    buffer = io.BytesIO()
+    wordcloud.to_image().save(buffer, 'PNG')
+    buffer.seek(0)
+    return buffer
+
+
 def interval_check_to_int(nb_intervals):
     """
     Check if the interval is a valid integer
@@ -446,7 +493,7 @@ def graph_type_check(graph_type, graph_types=None):
     :return: The graph type as a string
     """
     if graph_types is None:
-        graph_types = ['all', 'bar', 'pie', 'curve', 'histogram', 'tree_map']
+        graph_types = ['all', 'bar', 'pie', 'curve', 'histogram', 'tree_map', 'wordcloud']
 
     try:
         graph_type = str(graph_type)
@@ -649,6 +696,11 @@ def graph_images_year(nb_intervals=10, graph_type='all'):
                                y_values=image_count['count'])
         return Response(buffer.getvalue(), mimetype='image/png')
 
+    elif graph_type == 'wordcloud':
+        # Display a word cloud
+        buffer = display_wordcloud(words=list(image_count['Year'].astype(str)), frequencies=list(image_count['count']))
+        return Response(buffer.getvalue(), mimetype='image/png')
+
     elif graph_type == 'all':
         # Display all three types of graphs: bar, pie, and line charts
 
@@ -664,8 +716,12 @@ def graph_images_year(nb_intervals=10, graph_type='all'):
         buffer_line = display_curve(title=title, x_label=x_label, y_label=y_label, x_values=image_count['Year'],
                                     y_values=image_count['count'])
 
+        # Word cloud
+        buffer_wordcloud = display_wordcloud(words=list(image_count['Year'].astype(str)),
+                                             frequencies=list(image_count['count']))
+
         # Merge the three graphs into one image
-        merged_buffer = merge_buffers_to_img(buffer_bar, buffer_pie, buffer_line)
+        merged_buffer = merge_buffers_to_img(buffer_bar, buffer_pie, buffer_line, buffer_wordcloud)
 
         return Response(merged_buffer.getvalue(), mimetype='image/png')
     else:
@@ -720,13 +776,19 @@ def graph_images_brand(graph_type='all', nb_columns=5):
         # Display a pie chart
         buffer = display_pie(title=title, values=values, labels=labels)
         return Response(buffer.getvalue(), mimetype='image/png')
+    elif graph_type == 'wordcloud':
+        # Display a word cloud
+        buffer = display_wordcloud(words=labels, frequencies=values)
+        return Response(buffer.getvalue(), mimetype='image/png')
+
     elif graph_type == 'all':
         # Display both a bar graph and a pie chart
         buffer_bar = display_bar(title=title, x_label=x_label, y_label=y_label, x_values=labels, y_values=values)
         buffer_pie = display_pie(title=title, values=values, labels=labels)
+        buffer_wordcloud = display_wordcloud(words=labels, frequencies=values)
 
         # Merge the two graphs into one image
-        merged_buffer = merge_buffers_to_img(buffer_bar, buffer_pie)
+        merged_buffer = merge_buffers_to_img(buffer_bar, buffer_pie, buffer_wordcloud)
         return Response(merged_buffer.getvalue(), mimetype='image/png')
 
     else:
@@ -851,12 +913,18 @@ def graph_images_countries(nb_inter=5, graph='all'):
     elif graph == 'pie':
         buffer = display_pie(title=title, values=country_count.values, labels=country_count.index)
         return Response(buffer.getvalue(), mimetype='image/png')
+    elif graph == 'wordcloud':
+        # Display a word cloud
+        buffer = display_wordcloud(words=country_count.index, frequencies=country_count.values)
+        return Response(buffer.getvalue(), mimetype='image/png')
     else:
         buffer_bar = display_bar(title=title, x_label=x_label, y_label=y_label,
                                  x_values=country_count.index, y_values=country_count.values)
         buffer_pie = display_pie(title=title, values=country_count.values, labels=country_count.index)
+        buffer_wordcloud = display_wordcloud(words=country_count.index, frequencies=country_count.values)
+
         # Merge the two buffers into a single buffer
-        combined_buffer = merge_buffers_to_img(buffer_bar, buffer_pie)
+        combined_buffer = merge_buffers_to_img(buffer_bar, buffer_pie, buffer_wordcloud)
         return Response(combined_buffer.getvalue(), mimetype='image/png')
 
 
@@ -1038,14 +1106,18 @@ def graph_dominant_colors(nb_inter=20, graph='all'):
     elif graph == 'treemap':
         buffer = display_tree_map(title=title, sizes=sizes, labels=color_labels, colors=color, alpha=.7)
         return Response(buffer.getvalue(), mimetype='image/png')
+    elif graph == 'wordcloud':
+        buffer = display_wordcloud(words=color_labels, frequencies=sizes, word_to_color=True)
+        return Response(buffer.getvalue(), mimetype='image/png')
     else:
         buffer_bar = display_bar(title=title, x_label=x_label, y_label=y_label, colors=top_colors.keys(),
                                  x_values=top_colors.keys(), y_values=top_colors.values())
         buffer_pie = display_pie(title=title, values=top_colors.values(), labels=top_colors.keys(), colors=color_labels)
         buffer_treemap = display_tree_map(title=title, sizes=sizes, labels=color_labels, colors=color, alpha=.7)
+        buffer_wordcloud = display_wordcloud(words=color_labels, frequencies=sizes, word_to_color=True)
 
         # combine the 3 graphs
-        combined_buffer = merge_buffers_to_img(buffer_bar, buffer_pie, buffer_treemap)
+        combined_buffer = merge_buffers_to_img(buffer_bar, buffer_pie, buffer_treemap, buffer_wordcloud)
         return Response(combined_buffer.getvalue(), mimetype='image/png')
 
 
@@ -1086,13 +1158,19 @@ def graph_top_tags(nb_inter=5, graph='all'):
     elif graph == 'pie':
         buffer = display_pie(title=title, values=top_tags.values(), labels=top_tags.keys())
         return Response(buffer.getvalue(), mimetype='image/png')
+    elif graph == 'wordcloud':
+        # Display a word cloud
+        buffer = display_wordcloud(words=list(top_tags.keys()), frequencies=list(top_tags.values()))
+        return Response(buffer.getvalue(), mimetype='image/png')
+
     else:
         buffer_bar = display_bar(title=title, x_label=x_label, y_label=y_label,
                                  x_values=top_tags.keys(), y_values=top_tags.values())
         buffer_pie = display_pie(title=title, values=top_tags.values(), labels=top_tags.keys())
+        buffer_wordcloud = display_wordcloud(words=list(top_tags.keys()), frequencies=list(top_tags.values()))
 
         # combine the 2 graphs
-        combined_buffer = merge_buffers_to_img(buffer_bar, buffer_pie)
+        combined_buffer = merge_buffers_to_img(buffer_bar, buffer_pie, buffer_wordcloud)
         return Response(combined_buffer.getvalue(), mimetype='image/png')
 
 
