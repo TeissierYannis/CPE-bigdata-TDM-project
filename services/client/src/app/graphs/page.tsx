@@ -69,6 +69,17 @@ const Graphs: React.FC = () => {
                         )}
                     </div>
                 ))}
+                <div className="image-container mb-6 bg-white p-6 rounded-2xl shadow-md">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-4 text-center text-black">Images
+                        map</h2>
+                    <div className="flex justify-center items-center">
+                        <iframe
+                            title="JupyterLab"
+                            src="http://127.0.0.1:81/visualize/graph/map"
+                            className="w-full h-80"
+                        />
+                    </div>
+                </div>
             </main>
         </div>
     );
