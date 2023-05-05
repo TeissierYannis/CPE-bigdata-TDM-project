@@ -9,7 +9,6 @@ const Navbar: React.FC = () => {
         {name: 'Status', address: '/status'},
         {name: 'Graphs', address: '/graphs'},
         {name: 'Upload', address: '/upload'},
-        {name: 'Notebook', address: '/notebook'},
     ];
 
     return (
