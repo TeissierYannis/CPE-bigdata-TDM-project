@@ -40,6 +40,19 @@ http://127.0.0.1:4005
 You will find an interface to test the recommend service.
 Please do not use it before the download is finished.
 
+
+### lab
+
+To access the lab, on your browser, go to the following url :
+
+```bash
+http://127.0.0.1:8888/lab
+```
+
+In this lab, you will find a notebook to use the metadata that you can get from the database.
+This is for experimentation purpose only.
+Deactivate the lab if you want to use it in production.
+
 ## Endpoints
 
 You will find a postman library to test each of the following endpoints.
