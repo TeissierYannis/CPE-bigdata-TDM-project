@@ -282,7 +282,8 @@ services:
       - visualize
       - recommend
     ports:
-      - "4005:4005"
+      - "5005:5005"
+      - "8888:8888"
     restart: always
     networks:
       default:
@@ -312,30 +313,6 @@ services:
       default:
         aliases:
           - cdn
-
-  lab:
-    build: ./lab
-    depends_on:
-      - gateway
-      - gather
-      - harvest
-      - tools
-      - minio
-      - postgres
-      - standalone
-      - milvus-insight
-      - rabbitmq
-      - harvest_worker
-      - preprocess
-      - visualize
-      - recommend
-    ports:
-      - "8888:8888"
-    restart: always
-    networks:
-      default:
-        aliases:
-          - lab
 
 volumes:
   pg_data:

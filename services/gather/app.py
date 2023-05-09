@@ -1,6 +1,6 @@
 import asyncio
-import imghdr
 import io
+import uuid
 from typing import List
 
 import aiohttp
@@ -8,6 +8,7 @@ import os
 import pandas as pd
 from flask import Flask, jsonify, request
 import threading
+from PIL import Image
 from minio import Minio, S3Error
 
 from .classes import sharedprogress
@@ -128,6 +129,59 @@ def status():
         return {'status': 'error', 'message': f"Error occurred while downloading images"}
 
     return {'status': 'error', 'message': 'No download task is currently running'}
+
+
+def send_to_harvest_async(filename):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(send_to_harvest(aiohttp.ClientSession(), filename))
+    finally:
+        loop.close()
+
+
+@app.route('/uploads', methods=['POST'])
+def uploads():
+    # TODO: Try to handle more file (in quantity, after more than 10mb it fails and the container crashes)
+    """
+    This method will allow users to upload multiple images to the service. The images will be stored in the MinIO bucket.
+    :return:
+    """
+    if 'files[]' not in request.files:
+        return jsonify(status='error', message='No file part')
+
+    files = request.files.getlist('files[]')
+
+    # Open files and upload to Minio with Pillow
+    PIL_images = []
+    for file in files:
+        # is jpeg or jpg
+        if file and file.filename.split('.')[-1].lower() in ['jpeg', 'jpg']:
+            PIL_images.append(Image.open(file))
+
+    if len(files) == 0:
+        return jsonify(status='error', message='No selected file')
+
+    # Save images to Minio
+    for PIL_image in PIL_images:
+        with io.BytesIO() as output:
+            PIL_image.save(output, format="JPEG")
+            output.seek(0)  # Reset the output's file pointer to the beginning
+            minio_client.put_object(
+                bucket_name,
+                str(uuid.uuid4()) + '.jpg',
+                output,
+                len(output.getvalue()),
+                content_type='image/jpeg'
+            )
+
+    # Send an HTTP request to http://
+    for PIL_image in PIL_images:
+        filename = str(uuid.uuid4()) + '.jpg'
+        PIL_image.save(filename)
+        threading.Thread(target=send_to_harvest_async, args=(filename,)).start()
+
+    return jsonify(status='success', message='Files uploaded')
 
 
 @app.route('/api/v1/health', methods=['GET'])
