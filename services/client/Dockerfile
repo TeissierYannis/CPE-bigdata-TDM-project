@@ -30,7 +30,7 @@ COPY . .
 RUN npm run build
 
 # Expose the port the app runs on and the JupyterLab port
-EXPOSE 5005 8888
+EXPOSE 4005 8888
 
 # Start the application and JupyterLab server
 CMD ["tini", "--", "sh", "-c", "jupyter lab --no-browser --port=8888 --ip=0.0.0.0 --allow-root --LabApp.token='' & npm start"]
