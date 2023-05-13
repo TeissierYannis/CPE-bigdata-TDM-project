@@ -58,19 +58,18 @@ const Graphs: React.FC = () => {
                 <title>Images graphs</title>
             </Head>
 
-            <main className="p-8 justify-center">
-                <div className={'flex justify-center items-center py-2 px-4 mb-6 bg-white text-black font-semibold rounded'}>
-                    <button
-                        onClick={resetMetadata}
-                    >
-                        Reset metadata
-                    </button>
+            <main className="p-8 justify-center items-center">
+                <button
+                    className={'flex justify-center items-center py-2 px-4 mb-6 bg-white text-black font-semibold rounded'}
+                    onClick={resetMetadata}
+                >
+                    Reset metadata
                     <img
                         src="/icons/refresh-cw.svg"
                         alt="Refresh"
                         className="h-4 w-4 ml-3"
                     />
-                </div>
+                </button>
 
                 {IMAGE.map((image, index) => (
                     <div key={index} className="image-container mb-6 bg-white p-6 rounded-2xl shadow-md">
