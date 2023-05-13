@@ -264,6 +264,19 @@ def get_metadata():
             )
 
 
+@app.route('/reset', methods=['GET'])
+def reset_metadata():
+    """
+    Reset the metadata file
+    :return: A JSON object with the metadata
+    """
+    # remove the metadata file
+    if os.path.isfile('metadata.csv'):
+        os.remove('metadata.csv')
+
+    return get_metadata()
+
+
 def fig_to_buffer(fig):
     """
     Convert a figure to a buffer

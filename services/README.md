@@ -128,6 +128,14 @@ This will return a list of images id that match the preferences.
 
 The visualise service is available through many endpoints :
 
+- **metadata reset**:
+
+Since it is possible to use the metadata in several database reports, it is necessary to be able to obtain the latest version available. This route allows you to retrieve all the metadata again.
+
+```bash
+curl http://127.0.0.1:81/visualize/reset
+```
+
 - **images size static**:
 
 ```bash

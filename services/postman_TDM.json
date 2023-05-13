@@ -202,6 +202,31 @@
 			"name": "Visualize",
 			"item": [
 				{
+					"name": "reset",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://127.0.0.1:81/visualize/api/v1/reset",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "81",
+							"path": [
+								"visualize",
+								"api",
+								"v1",
+								"reset"
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "health",
 					"request": {
 						"method": "GET",
