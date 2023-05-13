@@ -46,7 +46,8 @@
         \item \textbf{Data Visualization}: We sought to expand the data visualization capabilities to align with the most relevant metadata obtained during the annotation and color extraction processes. This objective aimed to facilitate a better understanding of the dataset characteristics and user preferences.
         \item \textbf{Recommendation System Development}: A central objective of this project was the development of an effective image recommendation system. We explored various techniques, such as Euclidean distance, cosine similarity, and Reinforcement Learning, to identify the best approach for providing personalized image recommendations to users.
         \item \textbf{Web Interface Implementation}: The creation of a user-friendly web interface was our objective, enabling users to define their profiles and receive image recommendations. For the experimentation, we also allow from this interface the possibility to add images to the dataset, to observe the visual results of it, the state of our containers, as well as to create code for the exploitation of our data through a jupyter lab.
-    \item \end{itemize}
+        \item
+    \end{itemize}
 
     In annexe, you will find the~\hyperref[subsec:target_architecture]{\nameref{subsec:target_architecture}} proposed by the initial subject, followed by the~\hyperref[subsec:actual_architecture]{\nameref{subsec:actual_architecture}} of the project.
 
@@ -93,6 +94,7 @@
 
     \subsection{Upload New Images}\label{subsec:upload_images}
     In addition to the Unsplash dataset, our system also permits users to upload their own images. This feature is accessible via the web interface, which enables users to upload images from their local machine. The uploaded images are subsequently processed and stored in the database, accompanied by the extracted metadata, tags, and dominant colors. To prevent a timeout, there is a limit of 10 images per batch upload.
+
 
     \section{Architecture}\label{sec:architecture}
 
@@ -143,7 +145,6 @@
         \subitem [GET]: \texttt{/graph/tags/dendrogram}
         \subitem [GET]: \texttt{/graph/tags/top}
     \end{itemize}
-
 
 
     \section{Data exploration}\label{sec:exploration}
@@ -206,6 +207,7 @@
 
     \newpage
 
+
     \section{Project improvement}\label{sec:project_improvement}
     In terms of project improvement, we have identified several points that could be improved.
 
@@ -227,6 +229,7 @@
 
     \newpage
 
+
     \section{Conclusion}\label{sec:conclusion}
 
     In conclusion, we have successfully developed a comprehensive image recommendation system based on the Unsplash dataset, taking into account user preferences.
@@ -242,13 +245,14 @@
 
     \newpage
 
+
     \section{Bibliography}\label{sec:bibliography}
 
     \begin{thebibliography}{9}
 
         \bibitem{SamuelTDM}
         John Samuel.
-        \textit{Text Data Mining (TDM)}.
+        \textit{"Massive Data Processing" (TDM)}.
         Available at: \url{https://github.com/johnsamuelwrites/TDM}
 
         \bibitem{RenotteYoutube}
@@ -277,8 +281,8 @@
         Available at: \url{https://stable-baselines3.readthedocs.io/en/master/}
 
         \bibitem{Arxiv1312.5602}
-        A. Graves, A. Mohamed, and G. Hinton.
-        \textit{Speech Recognition with Deep Recurrent Neural Networks}.
+        Volodymyr Mnih, Koray Kavukcuoglu, David Silver, Alex Graves, Ioannis Antonoglou, Daan Wierstra, Martin Riedmiller
+        \textit{Playing Atari with Deep Reinforcement Learning}.
         Available at: \url{https://arxiv.org/pdf/1312.5602v1.pdf}
 
         \bibitem{HuggingFace}

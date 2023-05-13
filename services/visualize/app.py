@@ -240,19 +240,28 @@ def get_metadata():
         # If the file exists, read it
         return pd.read_csv('metadata.csv')
     else:
-        # Get the metadata from the database
-        # brut_metadata = get_metadata_from_mariadb_db(sql_database, sql_user, sql_password, sql_host)
-        brut_metadata = get_metadata_from_postgres_db()
-        # Clean the metadata
-        cln_metadata = clean_metadata(brut_metadata)
-        # Convert the metadata to a DataFrame
-        df_metadata = pd.DataFrame.from_dict(cln_metadata).transpose()
-        # Fill the 'Make' property NaN values with 'Undefined'
-        df_metadata['Make'].fillna('Undefined', inplace=True)
+        try:
+            # Get the metadata from the database
+            # brut_metadata = get_metadata_from_mariadb_db(sql_database, sql_user, sql_password, sql_host)
+            brut_metadata = get_metadata_from_postgres_db()
+            # Clean the metadata
+            cln_metadata = clean_metadata(brut_metadata)
+            # Convert the metadata to a DataFrame
+            df_metadata = pd.DataFrame.from_dict(cln_metadata).transpose()
+            # Fill the 'Make' property NaN values with 'Undefined'
+            df_metadata['Make'].fillna('Undefined', inplace=True)
+            df_metadata.to_csv('metadata.csv', index=False, mode='w')
+            return df_metadata
 
-        df_metadata.to_csv('metadata.csv', index=False, mode='w')
-
-        return df_metadata
+        except Exception as e:
+            # remove the metadata file if an error occured to get the metadata from the database again
+            if os.path.isfile('metadata.csv'):
+                os.remove('metadata.csv')
+            return Response(
+                "Error while getting the metadata from the database, please retry",
+                status=500,
+                mimetype='application/json'
+            )
 
 
 def fig_to_buffer(fig):
@@ -516,6 +525,8 @@ def graph_images_size_static(interval_size=3000, nb_intervals=2):
     """
     # Get the metadata
     df_meta = get_metadata()
+    if isinstance(df_meta, Response):
+        return df_meta
 
     # check values
     nb_intervals = interval_check_to_int(nb_intervals)
@@ -570,6 +581,8 @@ def graph_images_size_dynamic(nb_intervals=7, graph_type='all'):
     """
     # Get the metadata
     df_meta = get_metadata()
+    if isinstance(df_meta, Response):
+        return df_meta
 
     # check values
     nb_intervals = interval_check_to_int(nb_intervals)
@@ -656,6 +669,8 @@ def graph_images_year(nb_intervals=10, graph_type='all'):
     """
     # Get the metadata
     df_meta = get_metadata()
+    if isinstance(df_meta, Response):
+        return df_meta
 
     # Check the values
     graph_type = graph_type_check(graph_type)
@@ -740,6 +755,8 @@ def graph_images_brand(graph_type='all', nb_columns=5):
     """
     # Get the metadata
     df_meta = get_metadata()
+    if isinstance(df_meta, Response):
+        return df_meta
 
     # Fill the missing values with 'Undefined'
     df_meta['Make'].fillna('Undefined', inplace=True)
@@ -856,6 +873,8 @@ def display_coordinates_on_map():
     """
 
     df_meta = get_metadata()
+    if isinstance(df_meta, Response):
+        return df_meta
 
     coordinates_list = get_coordinates(df_meta, False)
 
@@ -886,6 +905,9 @@ def graph_images_countries(nb_inter=5, graph='all'):
     :param graph: type of graph to display (bar, pie, all)
     """
     df_meta = get_metadata()
+    if isinstance(df_meta, Response):
+        return df_meta
+
     coord_list = get_coordinates(df_meta, True)
 
     if coord_list is None:
@@ -938,6 +960,9 @@ def graph_images_altitudes(nb_inter=5, graph='all'):
     :param graph: type of graph to display (histogram, pie, all)
     """
     df_meta = get_metadata()
+    if isinstance(df_meta, Response):
+        return df_meta
+
     coord_list = get_coordinates(df_meta, False)
 
     if coord_list is None:
@@ -1036,6 +1061,8 @@ def graph_dominant_colors(nb_inter=20, graph='all'):
     """
     # Get the metadata
     df_meta = get_metadata()
+    if isinstance(df_meta, Response):
+        return df_meta
 
     # Check the parameters
     graph = graph_type_check(graph)
@@ -1132,6 +1159,8 @@ def graph_top_tags(nb_inter=5, graph='all'):
     """
     # get the metadata
     df_meta = get_metadata()
+    if isinstance(df_meta, Response):
+        return df_meta
 
     # Check the parameters
     graph = graph_type_check(graph)
@@ -1224,6 +1253,8 @@ def graph_categorized_tags():
     """
     # get the metadata
     df_meta = get_metadata()
+    if isinstance(df_meta, Response):
+        return df_meta
 
     # Check if the request body contains JSON data
     if request.is_json:
