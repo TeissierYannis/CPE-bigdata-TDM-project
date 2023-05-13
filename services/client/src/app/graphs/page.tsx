@@ -59,7 +59,7 @@ const Graphs: React.FC = () => {
             </Head>
 
             <main className="p-8 justify-center">
-                <div className={'flex justify-center items-center mt-4 py-2 px-4 mb-6 bg-white text-black font-semibold rounded'}>
+                <div className={'flex justify-center items-center py-2 px-4 mb-6 bg-white text-black font-semibold rounded'}>
                     <button
                         onClick={resetMetadata}
                     >
