@@ -5,6 +5,7 @@ import Link from 'next/link';
 const Navbar: React.FC = () => {
 
     const ENDPOINTS = [
+        {name: 'Main', address: '/'},
         {name: 'Recommend', address: '/recommend'},
         {name: 'Status', address: '/status'},
         {name: 'Graphs', address: '/graphs'},
