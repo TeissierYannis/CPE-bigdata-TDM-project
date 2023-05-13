@@ -271,10 +271,21 @@ def reset_metadata():
     :return: A JSON object with the metadata
     """
     # remove the metadata file
-    if os.path.isfile('metadata.csv'):
-        os.remove('metadata.csv')
-
-    return get_metadata()
+    try:
+        if os.path.isfile('metadata.csv'):
+            os.remove('metadata.csv')
+            get_metadata()
+            return Response(
+                "Metadata reset",
+                status=200,
+                mimetype='application/json'
+            )
+    except Exception as e:
+        return Response(
+            "Error while resetting the metadata, please retry",
+            status=500,
+            mimetype='application/json'
+        )
 
 
 def fig_to_buffer(fig):
