@@ -12,6 +12,9 @@ RUN apk add --no-cache tini
 
 # Install Jupyter Notebook, JupyterLab, and other dependencies
 RUN pip3 install --upgrade pip
+# Install libffi
+RUN apk add --no-cache libffi-dev
+RUN pip3 install argon2-cffi
 RUN pip3 install notebook jupyterlab
 
 # Set the working directory
@@ -21,7 +24,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm i
 
 # Copy the application source code
 COPY . .

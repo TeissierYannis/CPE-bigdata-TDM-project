@@ -45,8 +45,8 @@
         \item \textbf{Dominant Color Extraction}: We aimed to identify the four most dominant colors in each image to further enrich the metadata. To achieve this, we employed the K-means clustering algorithm, which allowed us to determine the most representative colors in each image effectively.
         \item \textbf{Data Visualization}: We sought to expand the data visualization capabilities to align with the most relevant metadata obtained during the annotation and color extraction processes. This objective aimed to facilitate a better understanding of the dataset characteristics and user preferences.
         \item \textbf{Recommendation System Development}: A central objective of this project was the development of an effective image recommendation system. We explored various techniques, such as Euclidean distance, cosine similarity, and Reinforcement Learning, to identify the best approach for providing personalized image recommendations to users.
-        \item \textbf{Web Interface Implementation}: The creation of a user-friendly web interface was our objective, enabling users to define their profiles and receive image recommendations.
-    \end{itemize}
+        \item \textbf{Web Interface Implementation}: The creation of a user-friendly web interface was our objective, enabling users to define their profiles and receive image recommendations. For the experimentation, we also allow from this interface the possibility to add images to the dataset, to observe the visual results of it, the state of our containers, as well as to create code for the exploitation of our data through a jupyter lab.
+    \item \end{itemize}
 
     In annexe, you will find the~\hyperref[subsec:target_architecture]{\nameref{subsec:target_architecture}} proposed by the initial subject, followed by the~\hyperref[subsec:actual_architecture]{\nameref{subsec:actual_architecture}} of the project.
 
@@ -82,6 +82,68 @@
     desired image dimensions (height and width), orientation (landscape or portrait),
     tags representing the elements they wish to visualize (up to a maximum of 5), and the preferred camera make.
     This information is then used to generate recommendations that align with the user's preferences.
+
+    \subsection{Jupyter Lab}\label{subsec:jupyter_lab}
+    In order to allow the exploitation of the database data freely, a jupyter lab is available on port 8888.
+    It contains a jupyter notebook with the code necessary to retrieve the metadata of the images converted into a dataframe.
+    Thus, it is possible to work with this data outside the framework provided by the other containers.
+    Nevertheless, the exploitation of such a container is not without risk.
+    Indeed, this solution should not be deployed in a production environment, because it offers access to resources and to a terminal allowing the alteration of the project.
+    Its use must therefore be restricted to an experimental environment.
+
+    \subsection{Upload New Images}\label{subsec:upload_images}
+    In addition to the Unsplash dataset, our system also permits users to upload their own images. This feature is accessible via the web interface, which enables users to upload images from their local machine. The uploaded images are subsequently processed and stored in the database, accompanied by the extracted metadata, tags, and dominant colors. To prevent a timeout, there is a limit of 10 images per batch upload.
+
+    \section{Architecture}\label{sec:architecture}
+
+    The project's architecture is divided into three components: the web interface, backend services, and storage.
+
+    The web interface, created with NextJS and ReactJS, is a single page application that communicates with the backend services via a REST API.
+
+    Before interacting with the various services of the API, a gateway redirects the requests to the appropriate service.
+
+    Backend services are built with Flask and Python. An automated component is invoked by the route \texttt{/gather/download}.
+
+    The different services include:
+    \begin{itemize}
+        \item Gather (downloads images from Unsplash, uploads images from the web interface, and saves them in the Minio database)
+        \item Harvest (sends images to RabbitMQ)
+        \item Harvest Worker (consumes images from RabbitMQ, extracts metadata, tags, and dominant colors, and saves them in the PostgreSQL database)
+        \item Processor (converts data to vectors and saves them in the Milvus database)
+        \item CDN (serves images from the Minio database)
+        \item Visualize (generates different visualizations and serves them to the web interface)
+        \item Recommendation (generates recommendations and serves them to the web interface)
+    \end{itemize}
+
+    The storage system consists of a PostgreSQL database, a Minio database, and a Milvus database. PostgreSQL is utilized to store the metadata of the images, Minio is used to store the images, and Milvus is used to store the vectors of the images.
+    Here are the public entry points of the different services:
+
+    \begin{itemize}
+        \item Gather: \texttt{http://127.0.0.1:81/gather}
+        \subitem [GET]: \texttt{/api/v1/health}
+        \subitem [GET]: \texttt{/download}
+        \subitem [GET]: \texttt{/status}
+        \subitem [POST]: \texttt{/uploads}
+        \item CDN : \texttt{http://127.0.0.1:81/cdn}
+        \subitem [GET]: \texttt{/api/v1/health}
+        \subitem [GET]: \texttt{/show/<filename>}
+        \item Recommend: \texttt{http://127.0.0.1:81/recommend}
+        \subitem [GET]: \texttt{/api/v1/health}
+        \subitem [POST]: \texttt{/recommend}
+        \item Visualize: \texttt{http://127.0.0.1:81/visualize}
+        \subitem [GET]: \texttt{/api/v1/health}
+        \subitem [GET]: \texttt{/graph/size/static/2000/4
+        \subitem [GET]: \texttt{/graph/size/dynamic}
+        \subitem [GET]: \texttt{/graph/year}
+        \subitem [GET]: \texttt{/graph/brand}
+        \subitem [GET]: \texttt{/graph/map}
+        \subitem [GET]: \texttt{/graph/countries}
+        \subitem [GET]: \texttt{/graph/altitude}
+        \subitem [GET]: \texttt{/graph/dominant_color}
+        \subitem [GET]: \texttt{/graph/tags/dendrogram}
+        \subitem [GET]: \texttt{/graph/tags/top}
+    \end{itemize}
+
 
 
     \section{Data exploration}\label{sec:exploration}
@@ -141,6 +203,27 @@
     Regarding the project, we would have liked to have more time to complete the exercises and the project, as the lack of time prevented us from achieving some of the objectives.
     The project being quite substantial, it would have been preferable to reduce its size and clearly define the expected goals.
     Additionally, a thorough review and correction of the project's implementation would have been a plus.
+
+    \newpage
+
+    \section{Project improvement}\label{sec:project_improvement}
+    In terms of project improvement, we have identified several points that could be improved.
+
+    \begin{itemize}
+        \item \textbf{Reinforcement Learning}: We have explored the use of Reinforcement Learning for our recommendation system, but ultimately decided on other methods due to the challenges in designing an effective reward system.\\However, we believe that this approach could be further explored and improved upon.
+        \item \textbf{Data collection}: Create a web crawler to collect data from different website.\\This would allow us to collect more data and to have more control over the data we collect.
+        \item \textbf{Data annotation}: Use a more advanced model to annotate the data.\\This would allow us to have more accurate annotations.
+        \item \textbf{Dominant color extraction}: Use a more advanced model to extract the dominant color.\\This would allow us to have more accurate dominant colors.
+        \item \textbf{Data visualization enhancement}: Use a more advanced model to enhance the data visualization.\\This would allow us to have more accurate data visualization.
+        \item \textbf{Web interface}: Improve the web interface.\\This would allow us to have a more user-friendly web interface.
+        \item \textbf{Data storage}: Use a more advanced database to store the data.\\This would allow us to have a more efficient database.
+        \item \textbf{Data processing}: Improve the way that the data is processed.\\This would allow us to have a more efficient data processing.
+        \item \textbf{Steaming flux}: Implement a way to process the data in a streaming flux.\\This would allow us to have a more efficient data processing.
+        \item \textbf{Recommender system}: Improve the recommender system.\\This would allow us to have a more efficient recommender system.
+        \item \textbf{Metrics}: Improve the metrics.\\This would allow us to have more accurate metrics.
+        \item \textbf{Deploy and scale}: Deploy and scale the project.\\This would allow us to have a more efficient project.
+        \item \textbf{Security}: Improve the security of the project.\\This would allow us to have a more secure project. Like the jupyter notebook to be adapted to a production environment.
+    \end{itemize}
 
     \newpage
 
