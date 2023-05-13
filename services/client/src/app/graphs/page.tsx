@@ -19,6 +19,15 @@ const Graphs: React.FC = () => {
     const [images, setImages] = useState<string[]>(Array(IMAGE.length).fill(null));
     const [isLoading, setIsLoading] = useState<boolean[]>(Array(IMAGE.length).fill(true));
 
+    const resetMetadata = async () => {
+        try {
+            await axios.get('http://127.0.0.1:81/visualize/reset');
+            alert('Les métadonnées ont été réinitialisées avec succès');
+        } catch (error) {
+            alert('Une erreur s\'est produite lors de la réinitialisation des métadonnées');
+        }
+    };
+
     useEffect(() => {
         const fetchImages = async () => {
             const imagePromises = IMAGE.map(async (image, index) => {
@@ -50,6 +59,19 @@ const Graphs: React.FC = () => {
             </Head>
 
             <main className="p-8 justify-center">
+                <div className={'flex justify-center items-center mt-4 py-2 px-4 mb-6 bg-white text-black font-semibold rounded'}>
+                    <button
+                        onClick={resetMetadata}
+                    >
+                        Reset metadata
+                    </button>
+                    <img
+                        src="/icons/refresh-cw.svg"
+                        alt="Refresh"
+                        className="h-4 w-4 ml-3"
+                    />
+                </div>
+
                 {IMAGE.map((image, index) => (
                     <div key={index} className="image-container mb-6 bg-white p-6 rounded-2xl shadow-md">
                         <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-4 text-center text-black">{image.title}</h2>
