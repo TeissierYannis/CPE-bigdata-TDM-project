@@ -1,5 +1,5 @@
 "use client";
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import axios from 'axios';
 import Head from 'next/head';
 
@@ -19,38 +19,40 @@ const Graphs: React.FC = () => {
     const [images, setImages] = useState<string[]>(Array(IMAGE.length).fill(null));
     const [isLoading, setIsLoading] = useState<boolean[]>(Array(IMAGE.length).fill(true));
 
+    const fetchImages = useCallback(async () => {
+        const imagePromises = IMAGE.map(async (image, index) => {
+            const response = await axios.get(`http://127.0.0.1:81${image.route}`, {responseType: 'arraybuffer'});
+            const imageBuffer = `data:image/png;base64,${Buffer.from(response.data, 'binary').toString('base64')}`;
+
+            setImages(prevImages => {
+                const newImages = [...prevImages];
+                newImages[index] = imageBuffer;
+                return newImages;
+            });
+
+            setIsLoading(prevLoading => {
+                const newLoading = [...prevLoading];
+                newLoading[index] = false;
+                return newLoading;
+            });
+        });
+
+        await Promise.all(imagePromises);
+    }, []);
+
     const resetMetadata = async () => {
         try {
+            setIsLoading(Array(IMAGE.length).fill(true));  // Set all images to loading state
             await axios.get('http://127.0.0.1:81/visualize/reset');
-            alert('Les métadonnées ont été réinitialisées avec succès');
+            await fetchImages();  // Re-fetch images after resetting metadata
         } catch (error) {
             alert('Une erreur s\'est produite lors de la réinitialisation des métadonnées');
         }
     };
 
     useEffect(() => {
-        const fetchImages = async () => {
-            const imagePromises = IMAGE.map(async (image, index) => {
-                const response = await axios.get(`http://127.0.0.1:81${image.route}`, {responseType: 'arraybuffer'});
-                const imageBuffer = `data:image/png;base64,${Buffer.from(response.data, 'binary').toString('base64')}`;
-
-                setImages(prevImages => {
-                    const newImages = [...prevImages];
-                    newImages[index] = imageBuffer;
-                    return newImages;
-                });
-
-                setIsLoading(prevLoading => {
-                    const newLoading = [...prevLoading];
-                    newLoading[index] = false;
-                    return newLoading;
-                });
-            });
-
-            await Promise.all(imagePromises);
-        };
         fetchImages();
-    }, []);
+    }, [fetchImages]);
 
     return (
         <div className="container bg-none min-h-screen justify-center">
@@ -60,7 +62,7 @@ const Graphs: React.FC = () => {
 
             <main className="p-8 justify-center items-center">
                 <button
-                    className={'flex justify-center items-center py-2 px-4 mb-6 bg-white text-black font-semibold rounded'}
+                    className={'w-full flex justify-center items-center py-2 px-4 mb-6 bg-white text-black font-semibold rounded'}
                     onClick={resetMetadata}
                 >
                     Reset metadata
