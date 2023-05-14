@@ -105,7 +105,7 @@ async def download():
         )
 
     photo_df = photo_df[photo_df['photo_image_url'].notnull()]
-    threading.Thread(target=start_download_task, args=(photo_df['photo_image_url'].tolist()[:100],)).start()
+    threading.Thread(target=start_download_task, args=(photo_df['photo_image_url'].tolist(),)).start()
 
     return {'status': 'success', 'message': 'Download started'}
 

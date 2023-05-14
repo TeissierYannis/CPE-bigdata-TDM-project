@@ -62,12 +62,12 @@ const Graphs: React.FC = () => {
 
             <main className="p-8 justify-center items-center">
                 <button
-                    className={'w-full flex justify-center items-center py-2 px-4 mb-6 bg-white text-black font-semibold rounded'}
+                    className={'w-full flex justify-center hover:bg-gray-300 items-center py-2 px-4 mb-6 bg-white text-black font-semibold rounded'}
                     onClick={resetMetadata}
                 >
                     Reset metadata
                     <img
-                        src="/icons/refresh-cw.svg"
+                        src="/icons/refresh.svg"
                         alt="Refresh"
                         className="h-4 w-4 ml-3"
                     />
